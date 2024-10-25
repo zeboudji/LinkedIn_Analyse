@@ -137,6 +137,18 @@ def generate_performance_graphs(excel_data):
         # Charger le fichier Excel
         xls = pd.ExcelFile(excel_data)
 
+        # Liste des feuilles disponibles
+        sheets = xls.sheet_names
+        st.write("Feuilles disponibles dans le fichier Excel :", sheets)
+
+        # Vérifier la présence des feuilles requises
+        required_sheets = ['ENGAGEMENT', 'ABONNÉS', 'MEILLEURS POSTS']
+        missing_sheets = [sheet for sheet in required_sheets if sheet not in sheets]
+
+        if missing_sheets:
+            st.error(f"Feuilles manquantes dans le fichier Excel : {', '.join(missing_sheets)}")
+            return (None,) * 12
+
         # Charger chaque feuille pertinente dans des dataframes
         engagement_df = pd.read_excel(xls, 'ENGAGEMENT')
         abonnés_df = pd.read_excel(xls, 'ABONNÉS', skiprows=2)
@@ -146,6 +158,29 @@ def generate_performance_graphs(excel_data):
         engagement_df.columns = engagement_df.columns.str.strip()
         abonnés_df.columns = abonnés_df.columns.str.strip()
         meilleurs_posts_df.columns = meilleurs_posts_df.columns.str.strip()
+
+        # Vérifier la présence des colonnes requises
+        required_columns_engagement = ['Date', 'Interactions', 'Impressions']
+        required_columns_abonnes = ['Date', 'Nouveaux abonnés']
+        required_columns_meilleurs_posts = ['Date de publication', 'Interactions']
+
+        missing_columns = []
+
+        for col in required_columns_engagement:
+            if col not in engagement_df.columns:
+                missing_columns.append(f"'ENGAGEMENT' - {col}")
+
+        for col in required_columns_abonnes:
+            if col not in abonnés_df.columns:
+                missing_columns.append(f"'ABONNÉS' - {col}")
+
+        for col in required_columns_meilleurs_posts:
+            if col not in meilleurs_posts_df.columns:
+                missing_columns.append(f"'MEILLEURS POSTS' - {col}")
+
+        if missing_columns:
+            st.error(f"Colonnes manquantes dans le fichier Excel : {', '.join(missing_columns)}")
+            return (None,) * 12
 
         # Convertir les colonnes de dates en datetime avec gestion des erreurs
         engagement_df['Date'] = pd.to_datetime(engagement_df['Date'], format='%d/%m/%Y', errors='coerce')
@@ -226,16 +261,16 @@ def generate_performance_graphs(excel_data):
 
     except FileNotFoundError:
         st.error("Le fichier Excel sélectionné est introuvable. Veuillez vérifier le chemin et réessayer.")
-        return (None, ) * 12
+        return (None,) * 12
     except pd.errors.EmptyDataError:
         st.error("Le fichier Excel est vide. Veuillez sélectionner un fichier contenant des données.")
-        return (None, ) * 12
+        return (None,) * 12
     except KeyError as e:
         st.error(f"Feuille manquante dans le fichier Excel : {e}")
-        return (None, ) * 12
+        return (None,) * 12
     except Exception as e:
         st.error(f"Une erreur inattendue est survenue : {e}")
-        return (None, ) * 12
+        return (None,) * 12
 
 # Interface utilisateur
 st.sidebar.header("Paramètres")
