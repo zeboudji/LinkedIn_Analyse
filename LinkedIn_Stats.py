@@ -4,7 +4,6 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import streamlit as st
 import matplotlib.dates as mdates
-from io import BytesIO
 
 st.set_page_config(page_title="Analyse des Performances LinkedIn", layout="wide")
 
@@ -40,7 +39,7 @@ def generate_performance_graphs(excel_data):
         # Conversion des dates pour matplotlib
         combined_df['Date'] = pd.to_datetime(combined_df['Date'])
 
-        # Configuration des graphiques
+        # Création des graphiques
         fig1, axs1 = plt.subplots(3, 1, figsize=(10, 12))
         fig1.suptitle('Performance des Réseaux Sociaux', fontsize=16)
 
