@@ -4,10 +4,13 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import streamlit as st
 import matplotlib.dates as mdates
+
 from io import BytesIO
 
+# Configuration de la page Streamlit
 st.set_page_config(page_title="Analyse des Performances LinkedIn", layout="wide")
 
+# Titre de l'application
 st.title("Analyse des Performances Réseaux Sociaux - LinkedIn")
 
 # Fonction pour générer les graphiques de performance
@@ -92,20 +95,22 @@ def generate_performance_graphs(excel_data):
 
         return fig1, fig2
 
-    # Interface utilisateur
-    st.sidebar.header("Paramètres")
+    except Exception as e:
+        st.error(f"Une erreur est survenue lors de la génération des graphiques : {e}")
+        return None, None
 
-    uploaded_file = st.sidebar.file_uploader("Sélectionnez un fichier Excel", type=["xlsx", "xls"])
+# Interface utilisateur
+st.sidebar.header("Paramètres")
 
-    if uploaded_file is not None:
-        try:
-            fig1, fig2 = generate_performance_graphs(uploaded_file)
+uploaded_file = st.sidebar.file_uploader("Sélectionnez un fichier Excel", type=["xlsx", "xls"])
 
-            # Affichage des graphiques
-            st.pyplot(fig1)
-            st.pyplot(fig2)
+if uploaded_file is not None:
+    # Appel de la fonction avec gestion des exceptions
+    fig1, fig2 = generate_performance_graphs(uploaded_file)
 
-        except Exception as e:
-            st.error(f"Une erreur est survenue lors du traitement du fichier : {e}")
-    else:
-        st.info("Veuillez télécharger un fichier Excel pour commencer l'analyse.")
+    if fig1 and fig2:
+        # Affichage des graphiques
+        st.pyplot(fig1)
+        st.pyplot(fig2)
+else:
+    st.info("Veuillez télécharger un fichier Excel pour commencer l'analyse.")
