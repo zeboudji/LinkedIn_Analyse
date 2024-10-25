@@ -4,6 +4,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import streamlit as st
 import matplotlib.dates as mdates
+from io import BytesIO
 
 st.set_page_config(page_title="Analyse des Performances LinkedIn", layout="wide")
 
@@ -40,49 +41,49 @@ def generate_performance_graphs(excel_data):
         combined_df['Date'] = pd.to_datetime(combined_df['Date'])
 
         # Création des graphiques
-        fig1, axs1 = plt.subplots(3, 1, figsize=(10, 12))
-        fig1.suptitle('Performance des Réseaux Sociaux', fontsize=16)
+        fig1, axs1 = plt.subplots(3, 1, figsize=(15, 18))
+        fig1.suptitle('Performance des Réseaux Sociaux', fontsize=20)
 
         # Graphique 1 : Nombre de posts par jour
         axs1[0].bar(combined_df['Date'], combined_df['Posts per Day'], color='purple')
-        axs1[0].set_title('Nombre de Posts par Jour')
-        axs1[0].set_ylabel('Posts')
+        axs1[0].set_title('Nombre de Posts par Jour', fontsize=14)
+        axs1[0].set_ylabel('Posts', fontsize=12)
         axs1[0].xaxis.set_major_formatter(mdates.DateFormatter('%d/%m/%Y'))
         axs1[0].tick_params(axis='x', rotation=45)
 
         # Graphique 2 : Impressions au fil du temps
         axs1[1].plot(combined_df['Date'], combined_df['Impressions'], marker='o', color='blue')
-        axs1[1].set_title('Impressions au Fil du Temps')
-        axs1[1].set_ylabel('Impressions')
+        axs1[1].set_title('Impressions au Fil du Temps', fontsize=14)
+        axs1[1].set_ylabel('Impressions', fontsize=12)
         axs1[1].xaxis.set_major_formatter(mdates.DateFormatter('%d/%m/%Y'))
         axs1[1].tick_params(axis='x', rotation=45)
 
         # Graphique 3 : Interactions au fil du temps
         axs1[2].plot(combined_df['Date'], combined_df['Interactions'], marker='x', color='orange')
-        axs1[2].set_title('Interactions au Fil du Temps')
-        axs1[2].set_ylabel('Interactions')
+        axs1[2].set_title('Interactions au Fil du Temps', fontsize=14)
+        axs1[2].set_ylabel('Interactions', fontsize=12)
         axs1[2].xaxis.set_major_formatter(mdates.DateFormatter('%d/%m/%Y'))
         axs1[2].tick_params(axis='x', rotation=45)
 
         plt.tight_layout(rect=[0, 0.03, 1, 0.95])
 
         # Graphiques supplémentaires
-        fig2, axs2 = plt.subplots(2, 1, figsize=(10, 8))
-        fig2.suptitle('Engagement et Abonnés', fontsize=16)
+        fig2, axs2 = plt.subplots(2, 1, figsize=(15, 12))
+        fig2.suptitle('Engagement et Abonnés', fontsize=20)
 
         # Taux d'engagement
         axs2[0].plot(combined_df['Date'], combined_df['Engagement Rate (%)'], marker='o', color='blue')
-        axs2[0].set_title('Taux d\'Engagement au Fil du Temps')
-        axs2[0].set_ylabel('Taux d\'Engagement (%)')
+        axs2[0].set_title('Taux d\'Engagement au Fil du Temps', fontsize=14)
+        axs2[0].set_ylabel('Taux d\'Engagement (%)', fontsize=12)
         axs2[0].xaxis.set_major_formatter(mdates.DateFormatter('%d/%m/%Y'))
         axs2[0].tick_params(axis='x', rotation=45)
         axs2[0].grid(True)
 
         # Abonnés cumulés
         axs2[1].plot(combined_df['Date'], combined_df['Cumulative Subscribers'], marker='o', color='green')
-        axs2[1].set_title('Abonnés Cumulés au Fil du Temps')
-        axs2[1].set_xlabel('Date')
-        axs2[1].set_ylabel('Abonnés Cumulés')
+        axs2[1].set_title('Abonnés Cumulés au Fil du Temps', fontsize=14)
+        axs2[1].set_xlabel('Date', fontsize=12)
+        axs2[1].set_ylabel('Abonnés Cumulés', fontsize=12)
         axs2[1].xaxis.set_major_formatter(mdates.DateFormatter('%d/%m/%Y'))
         axs2[1].tick_params(axis='x', rotation=45)
         axs2[1].grid(True)
