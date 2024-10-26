@@ -1,4 +1,5 @@
 import streamlit as st
+import pandas as pd
 import plotly.express as px
 import plotly.figure_factory as ff
 from sklearn.linear_model import LinearRegression
@@ -12,13 +13,30 @@ st.set_page_config(page_title="Analyse des Performances LinkedIn", layout="wide"
 def convert_df(df):
     return df.to_csv(index=False).encode('utf-8')
 
-# Fonction pour générer les graphiques de performance
+# Fonction pour valider la présence des feuilles requises
+def validate_sheets(xls, required_sheets):
+    available_sheets = xls.sheet_names
+    missing_sheets = [sheet for sheet in required_sheets if sheet not in available_sheets]
+    if missing_sheets:
+        raise ValueError(f"Feuilles manquantes dans le fichier Excel : {', '.join(missing_sheets)}")
+
+# Fonction pour renommer les colonnes de manière dynamique
+def rename_columns(df, mapping):
+    df = df.copy()
+    df.columns = [mapping.get(col.strip(), col.strip()) for col in df.columns]
+    return df
+
+# Fonction principale pour générer les graphiques de performance
 def generate_performance_graphs(excel_data):
     try:
         # Charger le fichier Excel
         xls = pd.ExcelFile(excel_data)
 
-        # Charger chaque feuille pertinente dans des dataframes
+        # Définir les feuilles requises
+        required_sheets = ['ENGAGEMENT', 'ABONNÉS', 'MEILLEURS POSTS', 'DONNÉES DÉMOGRAPHIQUES']
+        validate_sheets(xls, required_sheets)
+
+        # Charger les feuilles
         engagement_df = pd.read_excel(xls, 'ENGAGEMENT')
         abonnes_df = pd.read_excel(xls, 'ABONNÉS', skiprows=2)
         meilleurs_posts_df = pd.read_excel(xls, 'MEILLEURS POSTS').iloc[2:, 1:3]
@@ -29,6 +47,27 @@ def generate_performance_graphs(excel_data):
         abonnes_df.columns = abonnes_df.columns.str.strip()
         meilleurs_posts_df.columns = meilleurs_posts_df.columns.str.strip()
         demographics_df.columns = demographics_df.columns.str.strip()
+
+        # Renommer les colonnes de manière dynamique si nécessaire
+        # Ici, nous supposons que les colonnes essentielles sont présentes après le nettoyage
+        engagement_df = rename_columns(engagement_df, {
+            'Date Originale': 'Date',  # Exemple de mapping, ajustez selon vos données
+            'Interactions Original': 'Interactions',
+            'Impressions Original': 'Impressions'
+        })
+        abonnes_df = rename_columns(abonnes_df, {
+            'Date Originale': 'Date',
+            'Nouveaux abonnés Original': 'Nouveaux abonnés'
+        })
+        meilleurs_posts_df = rename_columns(meilleurs_posts_df, {
+            'Date de publication Originale': 'Date de publication',
+            'Interactions Originales': 'Interactions'
+        })
+        demographics_df = rename_columns(demographics_df, {
+            'Principales données démographiques Originale': 'Principales données démographiques',
+            'Valeur Originale': 'Valeur',
+            'Pourcentage Original': 'Pourcentage'
+        })
 
         # Nettoyer les données des posts
         meilleurs_posts_df.columns = ['Date de publication', 'Interactions']
@@ -63,11 +102,11 @@ def generate_performance_graphs(excel_data):
         combined_df = pd.merge(combined_df, abonnes_df_clean[['Date', 'Growth Rate']], on='Date', how='left')
         combined_df['Growth Rate'] = combined_df['Growth Rate'].fillna(0)
 
-        # **Extraire les dates de début et de fin**
+        # Extraire les dates de début et de fin
         start_date = combined_df['Date'].min().strftime('%d/%m/%Y')
         end_date = combined_df['Date'].max().strftime('%d/%m/%Y')
 
-        # **Mettre à jour le titre de l'application avec la période d'analyse**
+        # Mettre à jour le titre de l'application avec la période d'analyse
         st.title(f"Analyse des Performances Réseaux Sociaux - LinkedIn ({start_date} - {end_date})")
 
         # Graphique 1 : Nombre de posts par jour (Bar Chart)
@@ -276,7 +315,7 @@ def generate_performance_graphs(excel_data):
             fig.update_layout(xaxis_tickangle=-45)
             demographics_figures[category] = fig
 
-        # Prepare the return dict
+        # Préparer le dictionnaire de résultats
         return {
             "fig_posts": fig_posts,
             "explanation_posts": explanation_posts,
@@ -357,4 +396,34 @@ if uploaded_file is not None:
             st.plotly_chart(results["fig_corr_inter_impr"], use_container_width=True)
             st.markdown(results["explanation_corr_inter_impr"])
 
-            st.plotly_chart(res
+            st.plotly_chart(results["fig_corr_posts_engagement"], use_container_width=True)
+            st.markdown(results["explanation_corr_posts_engagement"])
+
+            st.header("Régression Linéaire")
+            st.plotly_chart(results["fig_regression"], use_container_width=True)
+            st.markdown(results["explanation_regression"])
+
+            # Ajouter des graphiques démographiques
+            st.header("Données Démographiques")
+            for category, fig in results["demographics_figures"].items():
+                st.plotly_chart(fig, use_container_width=True)
+
+            # Afficher les KPI
+            st.header("KPI Clés")
+            col1, col2, col3 = st.columns(3)
+            col1.metric("Taux d'Engagement Moyen (%)", f"{results['kpi_mean_engagement_rate']:.2f}")
+            col2.metric("Taux de Croissance Moyen (%)", f"{results['kpi_mean_growth_rate']:.2f}")
+            col3.metric("Total des Interactions", f"{int(results['kpi_total_interactions'])}")
+
+            # Afficher les recommandations
+            st.header("Recommandations")
+            st.markdown(results["recommendations"])
+
+            # Option de téléchargement
+            csv = convert_df(results["combined_df"])
+            st.download_button(
+                label="Télécharger les Données CSV",
+                data=csv,
+                file_name='combined_data.csv',
+                mime='text/csv',
+            )
