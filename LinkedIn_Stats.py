@@ -398,97 +398,91 @@ def generate_performance_graphs(dataframes):
             st.sidebar.write(available_sheets)
 
             # Vérifier si les feuilles attendues sont présentes
-            # Ici, les noms avec accents doivent être exacts
             required_sheets_default = ['ENGAGEMENT', 'ABONNÉS', 'MEILLEURS POSTS', 'DONNÉES DEMOGRAPHIQUES']
+            # Permettre à l'utilisateur de sélectionner les feuilles correspondantes
+            st.sidebar.subheader("Associez les feuilles Excel aux catégories")
 
-            missing_sheets = [sheet for sheet in required_sheets_default if sheet not in available_sheets]
-            if missing_sheets:
-                st.error(f"Feuilles manquantes dans le fichier Excel : {', '.join(missing_sheets)}")
-            else:
-                # Permettre à l'utilisateur de sélectionner les feuilles correspondantes
-                st.sidebar.subheader("Associez les feuilles Excel aux catégories")
+            sheet_engagement = st.sidebar.selectbox("Sélectionnez la feuille 'ENGAGEMENT'", available_sheets, index=0)
+            sheet_abonnes = st.sidebar.selectbox("Sélectionnez la feuille 'ABONNÉS'", available_sheets, index=1)
+            sheet_meilleurs_posts = st.sidebar.selectbox("Sélectionnez la feuille 'MEILLEURS POSTS'", available_sheets, index=2)
+            sheet_demographics = st.sidebar.selectbox("Sélectionnez la feuille 'DONNÉES DEMOGRAPHIQUES'", available_sheets, index=3)
 
-                sheet_engagement = st.sidebar.selectbox("Sélectionnez la feuille 'ENGAGEMENT'", available_sheets, index=available_sheets.index('ENGAGEMENT'))
-                sheet_abonnes = st.sidebar.selectbox("Sélectionnez la feuille 'ABONNÉS'", available_sheets, index=available_sheets.index('ABONNÉS'))
-                sheet_meilleurs_posts = st.sidebar.selectbox("Sélectionnez la feuille 'MEILLEURS POSTS'", available_sheets, index=available_sheets.index('MEILLEURS POSTS'))
-                sheet_demographics = st.sidebar.selectbox("Sélectionnez la feuille 'DONNÉES DEMOGRAPHIQUES'", available_sheets, index=available_sheets.index('DONNÉES DEMOGRAPHIQUES'))
+            # Charger les feuilles sélectionnées dans un dictionnaire
+            dataframes = {}
+            dataframes['ENGAGEMENT'] = pd.read_excel(xls, sheet_engagement)
+            dataframes['ABONNES'] = pd.read_excel(xls, sheet_abonnes, skiprows=2)
+            dataframes['MEILLEURS POSTS'] = pd.read_excel(xls, sheet_meilleurs_posts).iloc[2:, 1:3]
+            dataframes['DONNÉES DEMOGRAPHIQUES'] = pd.read_excel(xls, sheet_demographics)
 
-                # Charger les feuilles sélectionnées dans un dictionnaire
-                dataframes = {}
-                dataframes['ENGAGEMENT'] = pd.read_excel(xls, sheet_engagement)
-                dataframes['ABONNES'] = pd.read_excel(xls, sheet_abonnes, skiprows=2)
-                dataframes['MEILLEURS POSTS'] = pd.read_excel(xls, sheet_meilleurs_posts).iloc[2:, 1:3]
-                dataframes['DONNÉES DEMOGRAPHIQUES'] = pd.read_excel(xls, sheet_demographics)
+            # Appel de la fonction principale
+            results = generate_performance_graphs(dataframes)
 
-                # Appel de la fonction principale
-                results = generate_performance_graphs(dataframes)
+            if results:
+                # Organisation des graphiques dans des onglets
+                tab1, tab2, tab3 = st.tabs(["Performance des Posts", "Engagement et Abonnés", "Analyses Avancées"])
 
-                if results:
-                    # Organisation des graphiques dans des onglets
-                    tab1, tab2, tab3 = st.tabs(["Performance des Posts", "Engagement et Abonnés", "Analyses Avancées"])
+                with tab1:
+                    st.plotly_chart(results["fig_posts"], use_container_width=True)
+                    st.markdown(results["explanation_posts"])
 
-                    with tab1:
-                        st.plotly_chart(results["fig_posts"], use_container_width=True)
-                        st.markdown(results["explanation_posts"])
+                    st.plotly_chart(results["fig_impressions"], use_container_width=True)
+                    st.markdown(results["explanation_impressions"])
 
-                        st.plotly_chart(results["fig_impressions"], use_container_width=True)
-                        st.markdown(results["explanation_impressions"])
+                    st.plotly_chart(results["fig_interactions"], use_container_width=True)
+                    st.markdown(results["explanation_interactions"])
 
-                        st.plotly_chart(results["fig_interactions"], use_container_width=True)
-                        st.markdown(results["explanation_interactions"])
+                with tab2:
+                    st.plotly_chart(results["fig_engagement"], use_container_width=True)
+                    st.markdown(results["explanation_engagement"])
 
-                    with tab2:
-                        st.plotly_chart(results["fig_engagement"], use_container_width=True)
-                        st.markdown(results["explanation_engagement"])
+                    st.plotly_chart(results["fig_subscribers"], use_container_width=True)
+                    st.markdown(results["explanation_subscribers"])
 
-                        st.plotly_chart(results["fig_subscribers"], use_container_width=True)
-                        st.markdown(results["explanation_subscribers"])
+                    st.plotly_chart(results["fig_corr_abonnes_engagement"], use_container_width=True)
+                    st.markdown(results["explanation_corr_abonnes_engagement"])
 
-                        st.plotly_chart(results["fig_corr_abonnes_engagement"], use_container_width=True)
-                        st.markdown(results["explanation_corr_abonnes_engagement"])
+                    st.plotly_chart(results["fig_growth_peaks"], use_container_width=True)
+                    st.markdown(results["explanation_growth_peaks"])
 
-                        st.plotly_chart(results["fig_growth_peaks"], use_container_width=True)
-                        st.markdown(results["explanation_growth_peaks"])
+                with tab3:
+                    st.header("Matrice de Corrélation")
+                    st.plotly_chart(results["fig_corr_matrix"], use_container_width=True)
+                    st.markdown(results["explanation_corr_matrix"])
 
-                    with tab3:
-                        st.header("Matrice de Corrélation")
-                        st.plotly_chart(results["fig_corr_matrix"], use_container_width=True)
-                        st.markdown(results["explanation_corr_matrix"])
+                    st.header("Corrélations Supplémentaires")
+                    st.plotly_chart(results["fig_corr_inter_impr"], use_container_width=True)
+                    st.markdown(results["explanation_corr_inter_impr"])
 
-                        st.header("Corrélations Supplémentaires")
-                        st.plotly_chart(results["fig_corr_inter_impr"], use_container_width=True)
-                        st.markdown(results["explanation_corr_inter_impr"])
+                    st.plotly_chart(results["fig_corr_posts_engagement"], use_container_width=True)
+                    st.markdown(results["explanation_corr_posts_engagement"])
 
-                        st.plotly_chart(results["fig_corr_posts_engagement"], use_container_width=True)
-                        st.markdown(results["explanation_corr_posts_engagement"])
+                    st.header("Régression Linéaire")
+                    st.plotly_chart(results["fig_regression"], use_container_width=True)
+                    st.markdown(results["explanation_regression"])
 
-                        st.header("Régression Linéaire")
-                        st.plotly_chart(results["fig_regression"], use_container_width=True)
-                        st.markdown(results["explanation_regression"])
+                    # Ajouter des graphiques démographiques
+                    st.header("Données Démographiques")
+                    for category, fig in results["demographics_figures"].items():
+                        st.plotly_chart(fig, use_container_width=True)
 
-                        # Ajouter des graphiques démographiques
-                        st.header("Données Démographiques")
-                        for category, fig in results["demographics_figures"].items():
-                            st.plotly_chart(fig, use_container_width=True)
+                    # Afficher les KPI
+                    st.header("KPI Clés")
+                    col1, col2, col3 = st.columns(3)
+                    col1.metric("Taux d'Engagement Moyen (%)", f"{results['kpi_mean_engagement_rate']:.2f}")
+                    col2.metric("Taux de Croissance Moyen (%)", f"{results['kpi_mean_growth_rate']:.2f}")
+                    col3.metric("Total des Interactions", f"{int(results['kpi_total_interactions'])}")
 
-                        # Afficher les KPI
-                        st.header("KPI Clés")
-                        col1, col2, col3 = st.columns(3)
-                        col1.metric("Taux d'Engagement Moyen (%)", f"{results['kpi_mean_engagement_rate']:.2f}")
-                        col2.metric("Taux de Croissance Moyen (%)", f"{results['kpi_mean_growth_rate']:.2f}")
-                        col3.metric("Total des Interactions", f"{int(results['kpi_total_interactions'])}")
+                    # Afficher les recommandations
+                    st.header("Recommandations")
+                    st.markdown(results["recommendations"])
 
-                        # Afficher les recommandations
-                        st.header("Recommandations")
-                        st.markdown(results["recommendations"])
-
-                        # Option de téléchargement
-                        csv = convert_df(results["combined_df"])
-                        st.download_button(
-                            label="Télécharger les Données CSV",
-                            data=csv,
-                            file_name='combined_data.csv',
-                            mime='text/csv',
-                        )
+                    # Option de téléchargement
+                    csv = convert_df(results["combined_df"])
+                    st.download_button(
+                        label="Télécharger les Données CSV",
+                        data=csv,
+                        file_name='combined_data.csv',
+                        mime='text/csv',
+                    )
         except Exception as e:
             st.error(f"Une erreur est survenue lors de la génération des graphiques : {e}")
