@@ -8,8 +8,8 @@ from io import BytesIO
 # Configuration de la page Streamlit
 st.set_page_config(page_title="Analyse des Performances LinkedIn", layout="wide")
 
-# Titre de l'application
-st.title("Analyse des Performances Réseaux Sociaux - LinkedIn")
+# Nous retirons le titre ici pour le déplacer après l'extraction des dates
+# st.title("Analyse des Performances Réseaux Sociaux - LinkedIn")
 
 # Fonction pour générer les graphiques de performance
 def generate_performance_graphs(excel_data):
@@ -56,6 +56,13 @@ def generate_performance_graphs(excel_data):
 
         # Conversion des dates pour Plotly
         combined_df['Date'] = pd.to_datetime(combined_df['Date'])
+
+        # **Nouvelle section : Extraire les dates de début et de fin**
+        start_date = combined_df['Date'].min().strftime('%d/%m/%Y')
+        end_date = combined_df['Date'].max().strftime('%d/%m/%Y')
+
+        # **Mettre à jour le titre de l'application avec la période d'analyse**
+        st.title(f"Analyse des Performances Réseaux Sociaux - LinkedIn ({start_date} - {end_date})")
 
         # Graphique 1 : Nombre de posts par jour (Bar Chart)
         fig_posts = px.bar(combined_df, x='Date', y='Posts per Day',
