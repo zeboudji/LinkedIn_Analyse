@@ -39,8 +39,8 @@ def generate_performance_graphs(excel_data):
         abonnés_df_clean = abonnés_df.dropna()
         # Vérifier le nom exact de la colonne Date dans abonnés_df_clean
         date_column_abonnes = [col for col in abonnés_df_clean.columns if 'Date' in col][0]
-        abonnés_df_clean[date_column_abonnes] = pd.to_datetime(abonnés_df_clean[date_column_abonnes], format='%d/%m/%Y', errors='coerce')
         abonnés_df_clean.rename(columns={date_column_abonnes: 'Date'}, inplace=True)
+        abonnés_df_clean['Date'] = pd.to_datetime(abonnés_df_clean['Date'], format='%d/%m/%Y', errors='coerce')
         abonnés_df_clean['Nouveaux abonnés'] = pd.to_numeric(abonnés_df_clean['Nouveaux abonnés'], errors='coerce')
         abonnés_df_clean['Cumulative Subscribers'] = abonnés_df_clean['Nouveaux abonnés'].cumsum()
 
@@ -71,9 +71,10 @@ def generate_performance_graphs(excel_data):
                                   template='plotly_dark')
 
         # Graphique 3 : Interactions au fil du temps (Line Chart)
-        fig_interactions = px.line(combined_df, x='Date', y='Interactions_x',
+        # Correction : Utiliser 'Interactions' au lieu de 'Interactions_x'
+        fig_interactions = px.line(combined_df, x='Date', y='Interactions',
                                    title='Interactions au Fil du Temps',
-                                   labels={'Interactions_x': 'Interactions'},
+                                   labels={'Interactions': 'Interactions'},
                                    markers=True,
                                    template='plotly_dark')
 
@@ -98,7 +99,7 @@ def generate_performance_graphs(excel_data):
                                                  trendline="ols", template='plotly_dark')
 
         # Graphique 7 : Analyse des pics de croissance des abonnés (Line Chart)
-        abonnés_df_clean['Growth Rate'] = abonnés_df_clean['Nouveaux abonnés'].pct_change().fillna(0)
+        abonnés_df_clean['Growth Rate'] = abonnés_df_clean['Nouveaux abonnés'].pct_change().fillna(0) * 100  # En pourcentage
         fig_growth_peaks = px.line(abonnés_df_clean, x='Date', y='Growth Rate',
                                    title="Analyse des Pics de Croissance des Abonnés",
                                    labels={'Date': 'Date', 'Growth Rate': 'Taux de Croissance (%)'},
@@ -114,6 +115,9 @@ def generate_performance_graphs(excel_data):
 
         for category in demographics_categories:
             df_category = demographics_df[demographics_df['Principales données démographiques'] == category]
+
+            # Trier les valeurs par pourcentage décroissant
+            df_category = df_category.sort_values(by='Pourcentage', ascending=False)
 
             # Créer un graphique en barres pour chaque catégorie
             fig = px.bar(df_category, x='Valeur', y='Pourcentage',
