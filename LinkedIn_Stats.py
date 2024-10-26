@@ -58,11 +58,39 @@ def generate_performance_graphs(excel_data):
         fig_impressions = px.line(combined_df, x='Date', y='Impressions', title='Impressions au Fil du Temps', markers=True)
         fig_interactions = px.line(combined_df, x='Date', y='Interactions', title='Interactions au Fil du Temps', markers=True)
 
+        # Posts per day bar chart
+        posts_per_day = meilleurs_posts_df['Date de publication'].value_counts().sort_index()
+        combined_df['Posts per Day'] = combined_df['Date'].map(posts_per_day).fillna(0)
+        fig_posts_per_day = px.bar(combined_df, x='Date', y='Posts per Day', title='Nombre de Posts par Jour')
+
+        # Subscribers growth rate
+        abonnes_df['Growth Rate'] = abonnes_df['Nouveaux abonnés'].pct_change().fillna(0) * 100
+        fig_growth_rate = px.line(abonnes_df, x='Date', y='Growth Rate', title="Taux de Croissance des Abonnés", markers=True)
+
+        # Regression prediction
+        def regression_engagement(combined_df):
+            X = combined_df[['Impressions', 'Posts per Day', 'Cumulative Subscribers']]
+            y = combined_df['Engagement Rate (%)']
+
+            model = LinearRegression()
+            model.fit(X, y)
+            predictions = model.predict(X)
+
+            r2 = r2_score(y, predictions)
+            fig = px.scatter(x=y, y=predictions, title=f'Prédiction du Taux d\'Engagement (R² = {r2:.2f})')
+            fig.add_traces(px.line(x=y, y=y).data)
+            return fig, r2
+
+        fig_regression, r2_value = regression_engagement(combined_df)
+
         # Return the generated plots and cleaned dataframe
         return {
             "fig_engagement": fig_engagement,
             "fig_impressions": fig_impressions,
             "fig_interactions": fig_interactions,
+            "fig_posts_per_day": fig_posts_per_day,
+            "fig_growth_rate": fig_growth_rate,
+            "fig_regression": fig_regression,
             "combined_df": combined_df
         }
 
@@ -83,6 +111,9 @@ if uploaded_file is not None:
         st.plotly_chart(results["fig_engagement"], use_container_width=True)
         st.plotly_chart(results["fig_impressions"], use_container_width=True)
         st.plotly_chart(results["fig_interactions"], use_container_width=True)
+        st.plotly_chart(results["fig_posts_per_day"], use_container_width=True)
+        st.plotly_chart(results["fig_growth_rate"], use_container_width=True)
+        st.plotly_chart(results["fig_regression"], use_container_width=True)
 
         # CSV download option
         csv = convert_df(results["combined_df"])
