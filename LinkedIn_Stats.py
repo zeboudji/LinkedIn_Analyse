@@ -2,6 +2,7 @@ import pandas as pd
 import streamlit as st
 import plotly.express as px
 import plotly.figure_factory as ff
+import numpy as np
 
 from io import BytesIO
 
@@ -9,7 +10,7 @@ from io import BytesIO
 st.set_page_config(page_title="Analyse des Performances LinkedIn", layout="wide")
 
 # Titre de l'application
-st.title("Analyse des Performances Réseaux Sociaux - LinkedIn")
+st.title("📊 Analyse des Performances Réseaux Sociaux - LinkedIn")
 
 # Fonction pour générer les graphiques de performance
 def generate_performance_graphs(excel_data):
@@ -36,7 +37,7 @@ def generate_performance_graphs(excel_data):
         posts_per_day = meilleurs_posts_df['Date de publication'].value_counts().sort_index()
 
         # Nettoyer le dataframe des abonnés et calculer les abonnés cumulés
-        abonnés_df_clean = abonnés_df.dropna()
+        abonnés_df_clean = abonnés_df.dropna(subset=['Nouveaux abonnés'])
         # Vérifier le nom exact de la colonne Date dans abonnés_df_clean
         date_column_abonnes = [col for col in abonnés_df_clean.columns if 'Date' in col][0]
         abonnés_df_clean.rename(columns={date_column_abonnes: 'Date'}, inplace=True)
@@ -50,9 +51,36 @@ def generate_performance_graphs(excel_data):
         engagement_df['Date'] = pd.to_datetime(engagement_df['Date'], format='%d/%m/%Y', errors='coerce')
         engagement_df['Engagement Rate (%)'] = (engagement_df['Interactions'] / engagement_df['Impressions']) * 100
 
+        # Calculer les chiffres clés
+        total_subscribers = abonnés_df_clean['Cumulative Subscribers'].iloc[-1]
+        average_engagement_rate = engagement_df['Engagement Rate (%)'].mean()
+        total_impressions = engagement_df['Impressions'].sum()
+        total_interactions = engagement_df['Interactions'].sum()
+        average_subscriber_growth = abonnés_df_clean['Nouveaux abonnés'].mean()
+
         # Combiner les données pour le traçage
         combined_df = pd.merge(engagement_df, abonnés_df_clean, on='Date', how='left')
         combined_df['Posts per Day'] = combined_df['Date'].map(posts_per_day).fillna(0)
+
+        # Ajouter les colonnes 'Mois' et 'Année' pour les analyses mensuelles
+        combined_df['Mois'] = combined_df['Date'].dt.to_period('M')
+        abonnés_df_clean['Mois'] = abonnés_df_clean['Date'].dt.to_period('M')
+
+        # Calculer le taux d'engagement moyen par mois
+        monthly_engagement = combined_df.groupby('Mois')['Engagement Rate (%)'].mean().reset_index()
+        monthly_subscribers = abonnés_df_clean.groupby('Mois')['Nouveaux abonnés'].sum().reset_index()
+
+        # Graphique : Taux d'engagement moyen par mois
+        fig_monthly_engagement = px.line(monthly_engagement, x='Mois', y='Engagement Rate (%)',
+                                         title='Taux d\'Engagement Moyen par Mois',
+                                         labels={'Engagement Rate (%)': 'Taux d\'Engagement Moyen (%)'},
+                                         markers=True, template='plotly_dark')
+
+        # Graphique : Croissance des abonnés par mois
+        fig_monthly_subscribers = px.bar(monthly_subscribers, x='Mois', y='Nouveaux abonnés',
+                                         title='Croissance des Abonnés par Mois',
+                                         labels={'Nouveaux abonnés': 'Nouveaux Abonnés'},
+                                         template='plotly_dark')
 
         # Conversion des dates pour Plotly
         combined_df['Date'] = pd.to_datetime(combined_df['Date'])
@@ -85,7 +113,7 @@ def generate_performance_graphs(excel_data):
                                  template='plotly_dark')
 
         # Graphique 5 : Abonnés cumulés au fil du temps (Line Chart)
-        fig_subscribers = px.line(combined_df, x='Date', y='Cumulative Subscribers',
+        fig_subscribers = px.line(abonnés_df_clean, x='Date', y='Cumulative Subscribers',
                                   title='Abonnés Cumulés au Fil du Temps',
                                   labels={'Cumulative Subscribers': 'Abonnés Cumulés'},
                                   markers=True,
@@ -106,8 +134,6 @@ def generate_performance_graphs(excel_data):
 
         # Ajout des graphiques démographiques
         # Nettoyer les données démographiques
-
-        # Convertir 'Pourcentage' en string et gérer les valeurs manquantes
         demographics_df['Pourcentage'] = demographics_df['Pourcentage'].astype(str)
         demographics_df['Pourcentage'].replace('nan', pd.NA, inplace=True)
         demographics_df['Pourcentage'] = demographics_df['Pourcentage'].str.rstrip('%')
@@ -132,12 +158,15 @@ def generate_performance_graphs(excel_data):
             fig.update_layout(xaxis_tickangle=-45)
             demographics_figures[category] = fig
 
-        return (fig_posts, fig_impressions, fig_interactions, fig_engagement, fig_subscribers,
-                fig_corr_abonnes_engagement, fig_growth_peaks, demographics_figures)
+        # Retourner les chiffres clés et toutes les figures
+        return (total_subscribers, average_engagement_rate, total_impressions, total_interactions, average_subscriber_growth,
+                fig_posts, fig_impressions, fig_interactions, fig_engagement, fig_subscribers,
+                fig_corr_abonnes_engagement, fig_growth_peaks, fig_monthly_engagement, fig_monthly_subscribers, demographics_figures)
 
     except Exception as e:
         st.error(f"Une erreur est survenue lors de la génération des graphiques : {e}")
-        return [None] * 8
+        st.exception(e)
+        return [None] * 15
 
 # Interface utilisateur
 st.sidebar.header("Paramètres")
@@ -146,27 +175,50 @@ uploaded_file = st.sidebar.file_uploader("Sélectionnez un fichier Excel", type=
 
 if uploaded_file is not None:
     # Appel de la fonction avec gestion des exceptions
-    (fig_posts, fig_impressions, fig_interactions, fig_engagement, fig_subscribers,
-     fig_corr_abonnes_engagement, fig_growth_peaks, demographics_figures) = generate_performance_graphs(uploaded_file)
+    (total_subscribers, average_engagement_rate, total_impressions, total_interactions, average_subscriber_growth,
+     fig_posts, fig_impressions, fig_interactions, fig_engagement, fig_subscribers,
+     fig_corr_abonnes_engagement, fig_growth_peaks, fig_monthly_engagement, fig_monthly_subscribers, demographics_figures) = generate_performance_graphs(uploaded_file)
 
     if all([fig_posts, fig_impressions, fig_interactions, fig_engagement, fig_subscribers]):
-        # Organisation des graphiques dans des onglets
-        tab1, tab2, tab3 = st.tabs(["Performance des Posts", "Engagement et Abonnés", "Données Démographiques"])
+        # Affichage des chiffres clés
+        st.markdown("## 🗝️ Chiffres Clés")
 
-        with tab1:
-            st.plotly_chart(fig_posts, use_container_width=True)
-            st.plotly_chart(fig_impressions, use_container_width=True)
-            st.plotly_chart(fig_interactions, use_container_width=True)
+        col1, col2, col3, col4, col5 = st.columns(5)
 
-        with tab2:
-            st.plotly_chart(fig_engagement, use_container_width=True)
-            st.plotly_chart(fig_subscribers, use_container_width=True)
-            st.plotly_chart(fig_corr_abonnes_engagement, use_container_width=True)
-            st.plotly_chart(fig_growth_peaks, use_container_width=True)
+        col1.metric("Total Abonnés", f"{int(total_subscribers):,}".replace(",", " "))
+        col2.metric("Taux d'Engagement Moyen", f"{average_engagement_rate:.2f}%")
+        col3.metric("Total Impressions", f"{int(total_impressions):,}".replace(",", " "))
+        col4.metric("Total Interactions", f"{int(total_interactions):,}".replace(",", " "))
+        col5.metric("Croissance Moyenne des Abonnés", f"{average_subscriber_growth:.2f}")
 
-        with tab3:
-            for category, fig in demographics_figures.items():
-                st.plotly_chart(fig, use_container_width=True)
+        st.markdown("---")
+
+        # Organisation des graphiques en sections
+        st.markdown("## 📈 Tendances Générales")
+        st.plotly_chart(fig_impressions, use_container_width=True)
+        st.plotly_chart(fig_interactions, use_container_width=True)
+        st.plotly_chart(fig_engagement, use_container_width=True)
+        st.plotly_chart(fig_subscribers, use_container_width=True)
+
+        st.markdown("---")
+
+        st.markdown("## 📝 Performance des Posts")
+        st.plotly_chart(fig_posts, use_container_width=True)
+        st.plotly_chart(fig_monthly_engagement, use_container_width=True)
+        st.plotly_chart(fig_monthly_subscribers, use_container_width=True)
+
+        st.markdown("---")
+
+        st.markdown("## 🌍 Données Démographiques")
+        for category, fig in demographics_figures.items():
+            st.plotly_chart(fig, use_container_width=True)
+
+        st.markdown("---")
+
+        st.markdown("## 🔍 Analyses Supplémentaires")
+        st.plotly_chart(fig_corr_abonnes_engagement, use_container_width=True)
+        st.plotly_chart(fig_growth_peaks, use_container_width=True)
+
     else:
         st.error("Erreur dans la génération des graphiques.")
 else:
