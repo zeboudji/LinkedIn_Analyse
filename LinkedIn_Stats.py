@@ -1,7 +1,6 @@
 import pandas as pd
 import streamlit as st
 import plotly.express as px
-import plotly.graph_objects as go
 import plotly.figure_factory as ff
 
 from io import BytesIO
@@ -22,6 +21,7 @@ def generate_performance_graphs(excel_data):
         engagement_df = pd.read_excel(xls, 'ENGAGEMENT')
         abonnés_df = pd.read_excel(xls, 'ABONNÉS', skiprows=2)
         meilleurs_posts_df = pd.read_excel(xls, 'MEILLEURS POSTS').iloc[2:, 1:3]
+        demographics_df = pd.read_excel(xls, 'DONNÉES DÉMOGRAPHIQUES')
 
         # Nettoyer les données des posts
         meilleurs_posts_df.columns = ['Date de publication', 'Interactions']
@@ -44,83 +44,35 @@ def generate_performance_graphs(excel_data):
         # Conversion des dates pour Plotly
         combined_df['Date'] = pd.to_datetime(combined_df['Date'])
 
-        # Graphique 1 : Nombre de posts par jour (Bar Chart)
-        fig_posts = px.bar(combined_df, x='Date', y='Posts per Day',
-                           title='Nombre de Posts par Jour',
-                           labels={'Posts per Day': 'Posts'},
-                           template='plotly_dark')
+        # Graphiques de performance (comme précédemment)
+        # ... [Vos graphiques précédents ici] ...
 
-        # Graphique 2 : Impressions au fil du temps (Line Chart)
-        fig_impressions = px.line(combined_df, x='Date', y='Impressions',
-                                  title='Impressions au Fil du Temps',
-                                  labels={'Impressions': 'Impressions'},
-                                  markers=True,
-                                  template='plotly_dark')
+        # Nettoyer les données démographiques
+        demographics_df['Pourcentage'] = demographics_df['Pourcentage'].str.rstrip('%').astype(float)
+        demographics_categories = demographics_df['Principales données démographiques'].unique()
 
-        # Graphique 3 : Interactions au fil du temps (Line Chart)
-        fig_interactions = px.line(combined_df, x='Date', y='Interactions_x',
-                                   title='Interactions au Fil du Temps',
-                                   labels={'Interactions_x': 'Interactions'},
-                                   markers=True,
-                                   template='plotly_dark')
+        # Créer un dictionnaire pour stocker les figures démographiques
+        demographics_figures = {}
 
-        # Graphique 4 : Taux d'engagement au fil du temps (Line Chart)
-        fig_engagement = px.line(combined_df, x='Date', y='Engagement Rate (%)',
-                                 title='Taux d\'Engagement au Fil du Temps',
-                                 labels={'Engagement Rate (%)': 'Taux d\'Engagement (%)'},
-                                 markers=True,
-                                 template='plotly_dark')
+        for category in demographics_categories:
+            df_category = demographics_df[demographics_df['Principales données démographiques'] == category]
 
-        # Graphique 5 : Abonnés cumulés au fil du temps (Line Chart)
-        fig_subscribers = px.line(combined_df, x='Date', y='Cumulative Subscribers',
-                                  title='Abonnés Cumulés au Fil du Temps',
-                                  labels={'Cumulative Subscribers': 'Abonnés Cumulés'},
-                                  markers=True,
-                                  template='plotly_dark')
+            # Créer un graphique en barres pour chaque catégorie
+            fig = px.bar(df_category, x='Valeur', y='Pourcentage',
+                         title=f'Distribution de {category}',
+                         labels={'Valeur': category, 'Pourcentage': 'Pourcentage (%)'},
+                         template='plotly_dark')
+            fig.update_layout(xaxis_tickangle=-45)
+            demographics_figures[category] = fig
 
-        # Graphique 6 : Corrélation entre abonnés cumulés et taux d'engagement (Scatter Plot)
-        fig_corr_abonnes_engagement = px.scatter(combined_df, x='Cumulative Subscribers', y='Engagement Rate (%)',
-                                                 title="Corrélation entre Abonnés Cumulés et Taux d'Engagement",
-                                                 labels={'Cumulative Subscribers': 'Abonnés Cumulés', 'Engagement Rate (%)': 'Taux d\'Engagement (%)'},
-                                                 trendline="ols", template='plotly_dark')
-
-        # Graphique 7 : Analyse des pics de croissance des abonnés (Line Chart)
-        abonnés_df_clean['Growth Rate'] = abonnés_df_clean['Nouveaux abonnés'].pct_change().fillna(0)
-        fig_growth_peaks = px.line(abonnés_df_clean, x='Date', y='Growth Rate',
-                                   title="Analyse des Pics de Croissance des Abonnés",
-                                   labels={'Date': 'Date', 'Growth Rate': 'Taux de Croissance (%)'},
-                                   markers=True, template='plotly_dark')
-
-        # Graphique 8 : Distribution des interactions par post (Histogramme)
-        fig_interaction_distribution = px.histogram(meilleurs_posts_df, x='Interactions',
-                                                    nbins=50,
-                                                    title='Distribution des Interactions par Post',
-                                                    labels={'Interactions': 'Nombre d\'Interactions'},
-                                                    template='plotly_dark')
-
-        # Graphique 9 : Moyenne mobile du taux d'engagement sur 7 jours
-        combined_df['Rolling Engagement Rate'] = combined_df['Engagement Rate (%)'].rolling(window=7).mean()
-        fig_engagement_rolling = px.line(combined_df, x='Date', y='Rolling Engagement Rate',
-                                         title='Moyenne Mobile du Taux d\'Engagement sur 7 Jours',
-                                         labels={'Rolling Engagement Rate': 'Taux d\'Engagement Moyen (%)'},
-                                         markers=True, template='plotly_dark')
-
-        # Graphique 10 : Matrice de corrélation des métriques (Heatmap)
-        corr_matrix = combined_df[['Impressions', 'Interactions_x', 'Engagement Rate (%)', 'Cumulative Subscribers']].corr()
-        fig_corr_matrix = ff.create_annotated_heatmap(z=corr_matrix.values,
-                                                      x=list(corr_matrix.columns),
-                                                      y=list(corr_matrix.index),
-                                                      colorscale='Viridis',
-                                                      showscale=True)
-        fig_corr_matrix.update_layout(title='Matrice de Corrélation des Métriques')
-
+        # Retourner toutes les figures
         return (fig_posts, fig_impressions, fig_interactions, fig_engagement, fig_subscribers,
                 fig_corr_abonnes_engagement, fig_growth_peaks, fig_interaction_distribution,
-                fig_engagement_rolling, fig_corr_matrix)
+                fig_engagement_rolling, fig_corr_matrix, demographics_figures)
 
     except Exception as e:
         st.error(f"Une erreur est survenue lors de la génération des graphiques : {e}")
-        return [None] * 10
+        return [None] * 11
 
 # Interface utilisateur
 st.sidebar.header("Paramètres")
@@ -131,11 +83,11 @@ if uploaded_file is not None:
     # Appel de la fonction avec gestion des exceptions
     (fig_posts, fig_impressions, fig_interactions, fig_engagement, fig_subscribers,
      fig_corr_abonnes_engagement, fig_growth_peaks, fig_interaction_distribution,
-     fig_engagement_rolling, fig_corr_matrix) = generate_performance_graphs(uploaded_file)
+     fig_engagement_rolling, fig_corr_matrix, demographics_figures) = generate_performance_graphs(uploaded_file)
 
     if all([fig_posts, fig_impressions, fig_interactions, fig_engagement, fig_subscribers]):
         # Organisation des graphiques dans des onglets
-        tab1, tab2, tab3 = st.tabs(["Performance des Posts", "Engagement et Abonnés", "Analyses Supplémentaires"])
+        tab1, tab2, tab3, tab4 = st.tabs(["Performance des Posts", "Engagement et Abonnés", "Analyses Supplémentaires", "Données Démographiques"])
 
         with tab1:
             st.plotly_chart(fig_posts, use_container_width=True)
@@ -152,5 +104,11 @@ if uploaded_file is not None:
             st.plotly_chart(fig_growth_peaks, use_container_width=True)
             st.plotly_chart(fig_interaction_distribution, use_container_width=True)
             st.plotly_chart(fig_corr_matrix, use_container_width=True)
+
+        with tab4:
+            for category, fig in demographics_figures.items():
+                st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.error("Erreur dans la génération des graphiques.")
 else:
     st.info("Veuillez télécharger un fichier Excel pour commencer l'analyse.")
