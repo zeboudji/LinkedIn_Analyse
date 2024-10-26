@@ -50,8 +50,11 @@ def generate_performance_graphs(excel_data):
         # Merge the dataframes for analysis
         combined_df = pd.merge(engagement_df, abonnes_df[['Date', 'Cumulative Subscribers']], on='Date', how='left')
 
-        # Calculate engagement rate
-        combined_df['Engagement Rate (%)'] = (combined_df['Interactions'] / combined_df['Impressions']) * 100
+        # Calculate engagement rate and ensure no NaN
+        combined_df['Engagement Rate (%)'] = (combined_df['Interactions'] / combined_df['Impressions']).fillna(0) * 100
+
+        # Clean remaining NaN values
+        combined_df.fillna(0, inplace=True)
 
         # Create plots
         fig_engagement = px.line(combined_df, x='Date', y='Engagement Rate (%)', title="Taux d'Engagement", markers=True)
@@ -69,8 +72,9 @@ def generate_performance_graphs(excel_data):
 
         # Regression prediction
         def regression_engagement(combined_df):
-            X = combined_df[['Impressions', 'Posts per Day', 'Cumulative Subscribers']]
-            y = combined_df['Engagement Rate (%)']
+            # Ensure no NaN values in the columns used for regression
+            X = combined_df[['Impressions', 'Posts per Day', 'Cumulative Subscribers']].fillna(0)
+            y = combined_df['Engagement Rate (%)'].fillna(0)
 
             model = LinearRegression()
             model.fit(X, y)
