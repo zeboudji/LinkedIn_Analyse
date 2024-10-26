@@ -71,7 +71,6 @@ def generate_performance_graphs(excel_data):
                                   template='plotly_dark')
 
         # Graphique 3 : Interactions au fil du temps (Line Chart)
-        # Correction : Utiliser 'Interactions' au lieu de 'Interactions_x'
         fig_interactions = px.line(combined_df, x='Date', y='Interactions',
                                    title='Interactions au Fil du Temps',
                                    labels={'Interactions': 'Interactions'},
@@ -107,7 +106,13 @@ def generate_performance_graphs(excel_data):
 
         # Ajout des graphiques démographiques
         # Nettoyer les données démographiques
-        demographics_df['Pourcentage'] = demographics_df['Pourcentage'].str.rstrip('%').astype(float)
+
+        # Convertir 'Pourcentage' en string et gérer les valeurs manquantes
+        demographics_df['Pourcentage'] = demographics_df['Pourcentage'].astype(str)
+        demographics_df['Pourcentage'].replace('nan', pd.NA, inplace=True)
+        demographics_df['Pourcentage'] = demographics_df['Pourcentage'].str.rstrip('%')
+        demographics_df['Pourcentage'] = pd.to_numeric(demographics_df['Pourcentage'], errors='coerce')
+
         demographics_categories = demographics_df['Principales données démographiques'].unique()
 
         # Créer un dictionnaire pour stocker les figures démographiques
