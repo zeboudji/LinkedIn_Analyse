@@ -33,7 +33,7 @@ def generate_performance_graphs(excel_data):
         xls = pd.ExcelFile(excel_data)
 
         # Définir les feuilles requises
-        required_sheets = ['ENGAGEMENT', 'ABONNES', 'MEILLEURS POSTS', 'DONNEES DEMOGRAPHIQUES']
+        required_sheets = ['ENGAGEMENT', 'ABONNÉS', 'MEILLEURS POSTS', 'DONNÉES DÉMOGRAPHIQUES']
         validate_sheets(xls, required_sheets)
 
         # Charger les feuilles et les stocker dans un dictionnaire
