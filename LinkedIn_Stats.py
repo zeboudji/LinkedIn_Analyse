@@ -33,25 +33,23 @@ def generate_performance_graphs(excel_data):
         xls = pd.ExcelFile(excel_data)
 
         # Définir les feuilles requises
-        required_sheets = ['ENGAGEMENT', 'ABONNÉS', 'MEILLEURS POSTS', 'DONNÉES DÉMOGRAPHIQUES']
+        required_sheets = ['ENGAGEMENT', 'ABONNES', 'MEILLEURS POSTS', 'DONNEES DEMOGRAPHIQUES']
         validate_sheets(xls, required_sheets)
 
-        # Charger les feuilles
-        engagement_df = pd.read_excel(xls, 'ENGAGEMENT')
-        abonnes_df = pd.read_excel(xls, 'ABONNÉS', skiprows=2)
-        meilleurs_posts_df = pd.read_excel(xls, 'MEILLEURS POSTS').iloc[2:, 1:3]
-        demographics_df = pd.read_excel(xls, 'DONNÉES DÉMOGRAPHIQUES')
+        # Charger les feuilles et les stocker dans un dictionnaire
+        dataframes = {}
+        dataframes['ENGAGEMENT'] = pd.read_excel(xls, 'ENGAGEMENT')
+        dataframes['ABONNES'] = pd.read_excel(xls, 'ABONNES', skiprows=2)
+        dataframes['MEILLEURS POSTS'] = pd.read_excel(xls, 'MEILLEURS POSTS').iloc[2:, 1:3]
+        dataframes['DONNEES DEMOGRAPHIQUES'] = pd.read_excel(xls, 'DONNEES DEMOGRAPHIQUES')
 
         # Nettoyer les noms de colonnes pour enlever les espaces
-        engagement_df.columns = engagement_df.columns.str.strip()
-        abonnes_df.columns = abonnes_df.columns.str.strip()
-        meilleurs_posts_df.columns = meilleurs_posts_df.columns.str.strip()
-        demographics_df.columns = demographics_df.columns.str.strip()
+        for key in dataframes:
+            dataframes[key].columns = dataframes[key].columns.str.strip()
 
-        # Renommer les colonnes de manière dynamique si nécessaire
-        # Ici, ajustez le mapping selon vos données réelles
+        # Définir les mappings de renommage des colonnes
         mapping_engagement = {
-            'Date Originale': 'Date',  # Exemple de mapping, ajustez selon vos données
+            'Date Originale': 'Date',  # Ajustez selon vos données réelles
             'Interactions Original': 'Interactions',
             'Impressions Original': 'Impressions'
         }
@@ -64,30 +62,32 @@ def generate_performance_graphs(excel_data):
             'Interactions Originales': 'Interactions'
         }
         mapping_demographics = {
-            'Principales données démographiques Originale': 'Principales données démographiques',
+            'Principales donnees demographiques Originale': 'Principales donnees demographiques',
             'Valeur Originale': 'Valeur',
             'Pourcentage Original': 'Pourcentage'
         }
 
-        engagement_df = rename_columns(engagement_df, mapping_engagement)
-        abonnes_df = rename_columns(abonnes_df, mapping_abonnes)
-        meilleurs_posts_df = rename_columns(meilleurs_posts_df, mapping_meilleurs_posts)
-        demographics_df = rename_columns(demographics_df, mapping_demographics)
+        # Renommer les colonnes de manière dynamique
+        dataframes['ENGAGEMENT'] = rename_columns(dataframes['ENGAGEMENT'], mapping_engagement)
+        dataframes['ABONNES'] = rename_columns(dataframes['ABONNES'], mapping_abonnes)
+        dataframes['MEILLEURS POSTS'] = rename_columns(dataframes['MEILLEURS POSTS'], mapping_meilleurs_posts)
+        dataframes['DONNEES DEMOGRAPHIQUES'] = rename_columns(dataframes['DONNEES DEMOGRAPHIQUES'], mapping_demographics)
 
         # Vérification des colonnes essentielles après renommage
         essential_columns = {
             'ENGAGEMENT': ['Date', 'Interactions', 'Impressions'],
-            'ABONNÉS': ['Date', 'Nouveaux abonnés'],
+            'ABONNES': ['Date', 'Nouveaux abonnés'],
             'MEILLEURS POSTS': ['Date de publication', 'Interactions'],
-            'DONNÉES DÉMOGRAPHIQUES': ['Principales données démographiques', 'Valeur', 'Pourcentage']
+            'DONNEES DEMOGRAPHIQUES': ['Principales donnees demographiques', 'Valeur', 'Pourcentage']
         }
 
         for sheet, cols in essential_columns.items():
             for col in cols:
-                if col not in locals()[f"{sheet.lower()}_df"].columns:
+                if col not in dataframes[sheet].columns:
                     st.warning(f"La colonne '{col}' est manquante dans la feuille '{sheet}'. Certaines analyses pourraient être affectées.")
 
         # Nettoyer les données des posts
+        meilleurs_posts_df = dataframes['MEILLEURS POSTS'].copy()
         meilleurs_posts_df['Date de publication'] = pd.to_datetime(meilleurs_posts_df['Date de publication'], format='%d/%m/%Y', errors='coerce')
         meilleurs_posts_df['Interactions'] = pd.to_numeric(meilleurs_posts_df['Interactions'], errors='coerce')
 
@@ -100,16 +100,18 @@ def generate_performance_graphs(excel_data):
         posts_per_day = meilleurs_posts_df['Date de publication'].value_counts().sort_index()
 
         # Nettoyer le dataframe des abonnés et calculer les abonnés cumulés
-        abonnes_df_clean = abonnes_df.dropna(subset=['Date', 'Nouveaux abonnés'])
+        abonnes_df_clean = dataframes['ABONNES'].copy()
+        abonnes_df_clean = abonnes_df_clean.dropna(subset=['Date', 'Nouveaux abonnés'])
         abonnes_df_clean['Date'] = pd.to_datetime(abonnes_df_clean['Date'], format='%d/%m/%Y', errors='coerce')
         abonnes_df_clean['Nouveaux abonnés'] = pd.to_numeric(abonnes_df_clean['Nouveaux abonnés'], errors='coerce')
         abonnes_df_clean = abonnes_df_clean.dropna(subset=['Date', 'Nouveaux abonnés'])
         abonnes_df_clean['Cumulative Subscribers'] = abonnes_df_clean['Nouveaux abonnés'].cumsum()
 
         if abonnes_df_clean.empty:
-            st.warning("Le DataFrame 'ABONNÉS' est vide après nettoyage. Aucune donnée à afficher pour les abonnés.")
+            st.warning("Le DataFrame 'ABONNES' est vide après nettoyage. Aucune donnée à afficher pour les abonnés.")
 
         # Calculer le taux d'engagement
+        engagement_df = dataframes['ENGAGEMENT'].copy()
         engagement_df['Interactions'] = pd.to_numeric(engagement_df['Interactions'], errors='coerce')
         engagement_df['Impressions'] = pd.to_numeric(engagement_df['Impressions'], errors='coerce')
         engagement_df['Date'] = pd.to_datetime(engagement_df['Date'], format='%d/%m/%Y', errors='coerce')
@@ -131,8 +133,12 @@ def generate_performance_graphs(excel_data):
         combined_df['Growth Rate'] = combined_df['Growth Rate'].fillna(0)
 
         # Extraire les dates de début et de fin
-        start_date = combined_df['Date'].min().strftime('%d/%m/%Y') if not combined_df['Date'].isnull().all() else 'N/A'
-        end_date = combined_df['Date'].max().strftime('%d/%m/%Y') if not combined_df['Date'].isnull().all() else 'N/A'
+        if not combined_df['Date'].isnull().all():
+            start_date = combined_df['Date'].min().strftime('%d/%m/%Y')
+            end_date = combined_df['Date'].max().strftime('%d/%m/%Y')
+        else:
+            start_date = 'N/A'
+            end_date = 'N/A'
 
         # Mettre à jour le titre de l'application avec la période d'analyse
         st.title(f"Analyse des Performances Réseaux Sociaux - LinkedIn ({start_date} - {end_date})")
@@ -332,18 +338,19 @@ def generate_performance_graphs(excel_data):
 
         # Ajout des graphiques démographiques
         # Nettoyer les données démographiques
+        demographics_df = dataframes['DONNEES DEMOGRAPHIQUES'].copy()
         demographics_df['Pourcentage'] = demographics_df['Pourcentage'].astype(str)
         demographics_df['Pourcentage'].replace('nan', pd.NA, inplace=True)
         demographics_df['Pourcentage'] = demographics_df['Pourcentage'].str.rstrip('%')
         demographics_df['Pourcentage'] = pd.to_numeric(demographics_df['Pourcentage'], errors='coerce')
 
-        demographics_categories = demographics_df['Principales données démographiques'].dropna().unique()
+        demographics_categories = demographics_df['Principales donnees demographiques'].dropna().unique()
 
         # Créer un dictionnaire pour stocker les figures démographiques
         demographics_figures = {}
 
         for category in demographics_categories:
-            df_category = demographics_df[demographics_df['Principales données démographiques'] == category].dropna(subset=['Valeur', 'Pourcentage'])
+            df_category = demographics_df[demographics_df['Principales donnees demographiques'] == category].dropna(subset=['Valeur', 'Pourcentage'])
 
             if df_category.empty:
                 st.warning(f"Aucune donnée valide pour la catégorie démographique '{category}'.")
