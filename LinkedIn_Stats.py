@@ -63,8 +63,8 @@ def generate_performance_graphs(excel_data):
         combined_df['Posts per Day'] = combined_df['Date'].map(posts_per_day).fillna(0)
 
         # Ajouter les colonnes 'Mois' et 'Année' pour les analyses mensuelles
-        combined_df['Mois'] = combined_df['Date'].dt.to_period('M')
-        abonnés_df_clean['Mois'] = abonnés_df_clean['Date'].dt.to_period('M')
+        combined_df['Mois'] = combined_df['Date'].dt.to_period('M').astype(str)
+        abonnés_df_clean['Mois'] = abonnés_df_clean['Date'].dt.to_period('M').astype(str)
 
         # Calculer le taux d'engagement moyen par mois
         monthly_engagement = combined_df.groupby('Mois')['Engagement Rate (%)'].mean().reset_index()
