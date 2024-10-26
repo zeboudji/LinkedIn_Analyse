@@ -31,13 +31,14 @@ def generate_performance_graphs(excel_data):
 
         # Nettoyer le dataframe des abonnés et calculer les abonnés cumulés
         abonnés_df_clean = abonnés_df.dropna()
+        abonnés_df_clean['Date'] = pd.to_datetime(abonnés_df_clean['Date'], format='%d/%m/%Y', errors='coerce')
         abonnés_df_clean['Cumulative Subscribers'] = abonnés_df_clean['Nouveaux abonnés'].cumsum()
 
         # Calculer le taux d'engagement
         engagement_df['Engagement Rate (%)'] = (engagement_df['Interactions'] / engagement_df['Impressions']) * 100
 
         # Combiner les données pour le traçage
-        combined_df = pd.merge(engagement_df, abonnés_df_clean, left_on='Date', right_on='Date ', how='left')
+        combined_df = pd.merge(engagement_df, abonnés_df_clean, left_on='Date', right_on='Date', how='left')
         combined_df['Posts per Day'] = combined_df['Date'].map(posts_per_day).fillna(0)
 
         # Conversion des dates pour Plotly
@@ -77,11 +78,24 @@ def generate_performance_graphs(excel_data):
                                   markers=True,
                                   template='plotly_dark')
 
-        return fig_posts, fig_impressions, fig_interactions, fig_engagement, fig_subscribers
+        # Graphique 6 : Corrélation entre abonnés cumulés et taux d'engagement (Scatter Plot)
+        fig_corr_abonnes_engagement = px.scatter(combined_df, x='Cumulative Subscribers', y='Engagement Rate (%)',
+                                                 title="Corrélation entre Abonnés Cumulés et Taux d'Engagement",
+                                                 labels={'Cumulative Subscribers': 'Abonnés Cumulés', 'Engagement Rate (%)': 'Taux d\'Engagement (%)'},
+                                                 trendline="ols", template='plotly_dark')
+
+        # Graphique 7 : Analyse des pics de croissance des abonnés (Line Chart)
+        abonnés_df_clean['Growth Rate'] = abonnés_df_clean['Nouveaux abonnés'].pct_change().fillna(0)
+        fig_growth_peaks = px.line(abonnés_df_clean, x='Date', y='Growth Rate',
+                                   title="Analyse des Pics de Croissance des Abonnés",
+                                   labels={'Date': 'Date', 'Growth Rate': 'Taux de Croissance (%)'},
+                                   markers=True, template='plotly_dark')
+
+        return fig_posts, fig_impressions, fig_interactions, fig_engagement, fig_subscribers, fig_corr_abonnes_engagement, fig_growth_peaks
 
     except Exception as e:
         st.error(f"Une erreur est survenue lors de la génération des graphiques : {e}")
-        return None, None, None, None, None
+        return None, None, None, None, None, None, None
 
 # Interface utilisateur
 st.sidebar.header("Paramètres")
@@ -90,11 +104,11 @@ uploaded_file = st.sidebar.file_uploader("Sélectionnez un fichier Excel", type=
 
 if uploaded_file is not None:
     # Appel de la fonction avec gestion des exceptions
-    fig_posts, fig_impressions, fig_interactions, fig_engagement, fig_subscribers = generate_performance_graphs(uploaded_file)
+    fig_posts, fig_impressions, fig_interactions, fig_engagement, fig_subscribers, fig_corr_abonnes_engagement, fig_growth_peaks = generate_performance_graphs(uploaded_file)
 
     if fig_posts and fig_impressions and fig_interactions and fig_engagement and fig_subscribers:
         # Organisation des graphiques dans des onglets
-        tab1, tab2 = st.tabs(["Performance des Posts", "Engagement et Abonnés"])
+        tab1, tab2, tab3 = st.tabs(["Performance des Posts", "Engagement et Abonnés", "Analyses Supplémentaires"])
 
         with tab1:
             st.plotly_chart(fig_posts, use_container_width=True)
@@ -104,5 +118,9 @@ if uploaded_file is not None:
         with tab2:
             st.plotly_chart(fig_engagement, use_container_width=True)
             st.plotly_chart(fig_subscribers, use_container_width=True)
+
+        with tab3:
+            st.plotly_chart(fig_corr_abonnes_engagement, use_container_width=True)
+            st.plotly_chart(fig_growth_peaks, use_container_width=True)
 else:
     st.info("Veuillez télécharger un fichier Excel pour commencer l'analyse.")
