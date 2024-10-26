@@ -39,9 +39,9 @@ def generate_performance_graphs(excel_data):
         # Charger les feuilles et les stocker dans un dictionnaire
         dataframes = {}
         dataframes['ENGAGEMENT'] = pd.read_excel(xls, 'ENGAGEMENT')
-        dataframes['ABONNES'] = pd.read_excel(xls, 'ABONNES', skiprows=2)
+        dataframes['ABONNÉS'] = pd.read_excel(xls, 'ABONNÉS', skiprows=2)
         dataframes['MEILLEURS POSTS'] = pd.read_excel(xls, 'MEILLEURS POSTS').iloc[2:, 1:3]
-        dataframes['DONNEES DEMOGRAPHIQUES'] = pd.read_excel(xls, 'DONNEES DEMOGRAPHIQUES')
+        dataframes['DONNÉES DÉMOGRAPHIQUES'] = pd.read_excel(xls, 'DONNÉES DÉMOGRAPHIQUES')
 
         # Nettoyer les noms de colonnes pour enlever les espaces
         for key in dataframes:
