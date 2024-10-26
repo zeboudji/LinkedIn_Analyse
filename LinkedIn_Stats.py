@@ -1,5 +1,5 @@
-import streamlit as st
 import pandas as pd
+import streamlit as st
 import plotly.express as px
 import plotly.figure_factory as ff
 from sklearn.linear_model import LinearRegression
@@ -13,20 +13,17 @@ st.set_page_config(page_title="Analyse des Performances LinkedIn", layout="wide"
 def convert_df(df):
     return df.to_csv(index=False).encode('utf-8')
 
-# Fonction pour renommer les colonnes de manière dynamique
-def rename_columns(df, mapping):
-    df = df.copy()
-    df.columns = [mapping.get(col.strip(), col.strip()) for col in df.columns]
-    return df
-
-# Fonction principale pour générer les graphiques de performance
-def generate_performance_graphs(dataframes):
+# Fonction pour générer les graphiques de performance
+def generate_performance_graphs(excel_data):
     try:
-        # Extraction des DataFrames
-        engagement_df = dataframes['ENGAGEMENT'].copy()
-        abonnes_df = dataframes['ABONNES'].copy()
-        meilleurs_posts_df = dataframes['MEILLEURS POSTS'].copy()
-        demographics_df = dataframes['DONNÉES DEMOGRAPHIQUES'].copy()
+        # Charger le fichier Excel
+        xls = pd.ExcelFile(excel_data)
+
+        # Charger chaque feuille pertinente dans des dataframes
+        engagement_df = pd.read_excel(xls, 'ENGAGEMENT')
+        abonnes_df = pd.read_excel(xls, 'ABONNÉS', skiprows=2)
+        meilleurs_posts_df = pd.read_excel(xls, 'MEILLEURS POSTS').iloc[2:, 1:3]
+        demographics_df = pd.read_excel(xls, 'DONNÉES DÉMOGRAPHIQUES')
 
         # Nettoyer les noms de colonnes pour enlever les espaces
         engagement_df.columns = engagement_df.columns.str.strip()
@@ -34,75 +31,26 @@ def generate_performance_graphs(dataframes):
         meilleurs_posts_df.columns = meilleurs_posts_df.columns.str.strip()
         demographics_df.columns = demographics_df.columns.str.strip()
 
-        # Définir les mappings de renommage des colonnes
-        mapping_engagement = {
-            'Date Originale': 'Date',  # Ajustez selon vos données réelles
-            'Interactions Original': 'Interactions',
-            'Impressions Original': 'Impressions'
-        }
-        mapping_abonnes = {
-            'Date Originale': 'Date',
-            'Nouveaux abonnés Original': 'Nouveaux abonnés'
-        }
-        mapping_meilleurs_posts = {
-            'Date de publication Originale': 'Date de publication',
-            'Interactions Originales': 'Interactions'
-        }
-        mapping_demographics = {
-            'Principales données démographiques Originale': 'Principales données démographiques',
-            'Valeur Originale': 'Valeur',
-            'Pourcentage Original': 'Pourcentage'
-        }
-
-        # Renommer les colonnes de manière dynamique
-        engagement_df = rename_columns(engagement_df, mapping_engagement)
-        abonnes_df = rename_columns(abonnes_df, mapping_abonnes)
-        meilleurs_posts_df = rename_columns(meilleurs_posts_df, mapping_meilleurs_posts)
-        demographics_df = rename_columns(demographics_df, mapping_demographics)
-
-        # Vérification des colonnes essentielles après renommage
-        essential_columns = {
-            'ENGAGEMENT': ['Date', 'Interactions', 'Impressions'],
-            'ABONNES': ['Date', 'Nouveaux abonnés'],
-            'MEILLEURS POSTS': ['Date de publication', 'Interactions'],
-            'DONNÉES DEMOGRAPHIQUES': ['Principales données démographiques', 'Valeur', 'Pourcentage']
-        }
-
-        for sheet, cols in essential_columns.items():
-            for col in cols:
-                if col not in dataframes[sheet].columns:
-                    st.warning(f"La colonne '{col}' est manquante dans la feuille '{sheet}'. Certaines analyses pourraient être affectées.")
-
         # Nettoyer les données des posts
+        meilleurs_posts_df.columns = ['Date de publication', 'Interactions']
         meilleurs_posts_df['Date de publication'] = pd.to_datetime(meilleurs_posts_df['Date de publication'], format='%d/%m/%Y', errors='coerce')
         meilleurs_posts_df['Interactions'] = pd.to_numeric(meilleurs_posts_df['Interactions'], errors='coerce')
-
-        # Gérer les valeurs NaN après conversion
-        meilleurs_posts_df = meilleurs_posts_df.dropna(subset=['Date de publication', 'Interactions'])
-
-        if meilleurs_posts_df.empty:
-            st.warning("Le DataFrame 'MEILLEURS POSTS' est vide après nettoyage. Aucune donnée à afficher pour les meilleurs posts.")
-
         posts_per_day = meilleurs_posts_df['Date de publication'].value_counts().sort_index()
 
         # Nettoyer le dataframe des abonnés et calculer les abonnés cumulés
-        abonnes_df_clean = abonnes_df.dropna(subset=['Date', 'Nouveaux abonnés'])
+        abonnes_df_clean = abonnes_df.dropna()
+        # Vérifier le nom exact de la colonne Date dans abonnes_df_clean
+        date_column_abonnes = [col for col in abonnes_df_clean.columns if 'Date' in col][0]
+        abonnes_df_clean.rename(columns={date_column_abonnes: 'Date'}, inplace=True)
         abonnes_df_clean['Date'] = pd.to_datetime(abonnes_df_clean['Date'], format='%d/%m/%Y', errors='coerce')
         abonnes_df_clean['Nouveaux abonnés'] = pd.to_numeric(abonnes_df_clean['Nouveaux abonnés'], errors='coerce')
-        abonnes_df_clean = abonnes_df_clean.dropna(subset=['Date', 'Nouveaux abonnés'])
         abonnes_df_clean['Cumulative Subscribers'] = abonnes_df_clean['Nouveaux abonnés'].cumsum()
-
-        if abonnes_df_clean.empty:
-            st.warning("Le DataFrame 'ABONNES' est vide après nettoyage. Aucune donnée à afficher pour les abonnés.")
 
         # Calculer le taux d'engagement
         engagement_df['Interactions'] = pd.to_numeric(engagement_df['Interactions'], errors='coerce')
         engagement_df['Impressions'] = pd.to_numeric(engagement_df['Impressions'], errors='coerce')
         engagement_df['Date'] = pd.to_datetime(engagement_df['Date'], format='%d/%m/%Y', errors='coerce')
         engagement_df['Engagement Rate (%)'] = (engagement_df['Interactions'] / engagement_df['Impressions']) * 100
-
-        # Gérer les NaN dans les taux d'engagement
-        engagement_df['Engagement Rate (%)'] = engagement_df['Engagement Rate (%)'].fillna(0)
 
         # Combiner les données pour le traçage
         combined_df = pd.merge(engagement_df, abonnes_df_clean, on='Date', how='left')
@@ -116,21 +64,12 @@ def generate_performance_graphs(dataframes):
         combined_df = pd.merge(combined_df, abonnes_df_clean[['Date', 'Growth Rate']], on='Date', how='left')
         combined_df['Growth Rate'] = combined_df['Growth Rate'].fillna(0)
 
-        # Extraire les dates de début et de fin
-        if not combined_df['Date'].isnull().all():
-            start_date = combined_df['Date'].min().strftime('%d/%m/%Y')
-            end_date = combined_df['Date'].max().strftime('%d/%m/%Y')
-        else:
-            start_date = 'N/A'
-            end_date = 'N/A'
+        # **Extraire les dates de début et de fin**
+        start_date = combined_df['Date'].min().strftime('%d/%m/%Y')
+        end_date = combined_df['Date'].max().strftime('%d/%m/%Y')
 
-        # Mettre à jour le titre de l'application avec la période d'analyse
+        # **Mettre à jour le titre de l'application avec la période d'analyse**
         st.title(f"Analyse des Performances Réseaux Sociaux - LinkedIn ({start_date} - {end_date})")
-
-        # Vérifier si combined_df est vide
-        if combined_df.empty:
-            st.warning("Le DataFrame combiné est vide. Aucune donnée à afficher.")
-            return None
 
         # Graphique 1 : Nombre de posts par jour (Bar Chart)
         fig_posts = px.bar(combined_df, x='Date', y='Posts per Day',
@@ -273,13 +212,8 @@ def generate_performance_graphs(dataframes):
 
         # Graphique 10 : Régression Linéaire pour Prédire le Taux d'Engagement
         def regression_engagement(combined_df):
-            # Sélectionner les colonnes pertinentes et gérer les NaN
-            X = combined_df[['Impressions', 'Posts per Day', 'Cumulative Subscribers']].dropna()
-            y = combined_df.loc[X.index, 'Engagement Rate (%)']
-
-            if X.empty or y.empty:
-                st.warning("Pas assez de données pour effectuer la régression linéaire.")
-                return None, None
+            X = combined_df[['Impressions', 'Posts per Day', 'Cumulative Subscribers']]
+            y = combined_df['Engagement Rate (%)']
 
             model = LinearRegression()
             model.fit(X, y)
@@ -297,14 +231,11 @@ def generate_performance_graphs(dataframes):
         fig_regression, r2_value = regression_engagement(combined_df)
 
         # Explication pour le graphique 10
-        if fig_regression is not None:
-            explanation_regression = f"""
-            **Interprétation :** Ce graphique montre la prédiction du taux d'engagement basé sur les impressions, le nombre de posts par jour et le nombre d'abonnés cumulés. 
-            Le coefficient de détermination (R² = {r2_value:.2f}) indique la proportion de la variance du taux d'engagement expliquée par le modèle. 
-            Un R² proche de 1 suggère que le modèle prédit bien le taux d'engagement.
-            """
-        else:
-            explanation_regression = "**Interprétation :** Pas assez de données pour effectuer la régression linéaire."
+        explanation_regression = f"""
+        **Interprétation :** Ce graphique montre la prédiction du taux d'engagement basé sur les impressions, le nombre de posts par jour et le nombre d'abonnés cumulés. 
+        Le coefficient de détermination (R² = {r2_value:.2f}) indique la proportion de la variance du taux d'engagement expliquée par le modèle. 
+        Un R² proche de 1 suggère que le modèle prédit bien le taux d'engagement.
+        """
 
         # Calcul des KPI
         mean_engagement_rate = combined_df['Engagement Rate (%)'].mean()
@@ -327,17 +258,13 @@ def generate_performance_graphs(dataframes):
         demographics_df['Pourcentage'] = demographics_df['Pourcentage'].str.rstrip('%')
         demographics_df['Pourcentage'] = pd.to_numeric(demographics_df['Pourcentage'], errors='coerce')
 
-        demographics_categories = demographics_df['Principales données démographiques'].dropna().unique()
+        demographics_categories = demographics_df['Principales données démographiques'].unique()
 
         # Créer un dictionnaire pour stocker les figures démographiques
         demographics_figures = {}
 
         for category in demographics_categories:
-            df_category = demographics_df[demographics_df['Principales données démographiques'] == category].dropna(subset=['Valeur', 'Pourcentage'])
-
-            if df_category.empty:
-                st.warning(f"Aucune donnée valide pour la catégorie démographique '{category}'.")
-                continue
+            df_category = demographics_df[demographics_df['Principales données démographiques'] == category]
 
             # Trier les valeurs par pourcentage décroissant
             df_category = df_category.sort_values(by='Pourcentage', ascending=False)
@@ -350,7 +277,7 @@ def generate_performance_graphs(dataframes):
             fig.update_layout(xaxis_tickangle=-45)
             demographics_figures[category] = fig
 
-        # Préparer le dictionnaire de résultats
+        # Prepare the return dict
         return {
             "fig_posts": fig_posts,
             "explanation_posts": explanation_posts,
@@ -382,107 +309,85 @@ def generate_performance_graphs(dataframes):
             "combined_df": combined_df  # Pour le téléchargement
         }
 
-    # Interface utilisateur
-    st.sidebar.header("Paramètres")
+    except Exception as e:
+        st.error(f"Une erreur est survenue lors de la génération des graphiques : {e}")
+        return None
 
-    uploaded_file = st.sidebar.file_uploader("Sélectionnez un fichier Excel", type=["xlsx", "xls"])
+# Interface utilisateur
+st.sidebar.header("Paramètres")
 
-    if uploaded_file is not None:
-        try:
-            # Charger le fichier Excel
-            xls = pd.ExcelFile(uploaded_file)
-            available_sheets = xls.sheet_names
+uploaded_file = st.sidebar.file_uploader("Sélectionnez un fichier Excel", type=["xlsx", "xls"])
 
-            # Afficher les feuilles disponibles
-            st.sidebar.subheader("Feuilles disponibles dans le fichier Excel")
-            st.sidebar.write(available_sheets)
+if uploaded_file is not None:
+    # Appel de la fonction avec gestion des exceptions
+    results = generate_performance_graphs(uploaded_file)
 
-            # Vérifier si les feuilles attendues sont présentes
-            required_sheets_default = ['ENGAGEMENT', 'ABONNÉS', 'MEILLEURS POSTS', 'DONNÉES DEMOGRAPHIQUES']
-            # Permettre à l'utilisateur de sélectionner les feuilles correspondantes
-            st.sidebar.subheader("Associez les feuilles Excel aux catégories")
+    if results:
+        # Organisation des graphiques dans des onglets
+        tab1, tab2, tab3 = st.tabs(["Performance des Posts", "Engagement et Abonnés", "Analyses Avancées"])
 
-            sheet_engagement = st.sidebar.selectbox("Sélectionnez la feuille 'ENGAGEMENT'", available_sheets, index=0)
-            sheet_abonnes = st.sidebar.selectbox("Sélectionnez la feuille 'ABONNÉS'", available_sheets, index=1)
-            sheet_meilleurs_posts = st.sidebar.selectbox("Sélectionnez la feuille 'MEILLEURS POSTS'", available_sheets, index=2)
-            sheet_demographics = st.sidebar.selectbox("Sélectionnez la feuille 'DONNÉES DEMOGRAPHIQUES'", available_sheets, index=3)
+        with tab1:
+            st.plotly_chart(results["fig_posts"], use_container_width=True)
+            st.markdown(results["explanation_posts"])
 
-            # Charger les feuilles sélectionnées dans un dictionnaire
-            dataframes = {}
-            dataframes['ENGAGEMENT'] = pd.read_excel(xls, sheet_engagement)
-            dataframes['ABONNES'] = pd.read_excel(xls, sheet_abonnes, skiprows=2)
-            dataframes['MEILLEURS POSTS'] = pd.read_excel(xls, sheet_meilleurs_posts).iloc[2:, 1:3]
-            dataframes['DONNÉES DEMOGRAPHIQUES'] = pd.read_excel(xls, sheet_demographics)
+            st.plotly_chart(results["fig_impressions"], use_container_width=True)
+            st.markdown(results["explanation_impressions"])
 
-            # Appel de la fonction principale
-            results = generate_performance_graphs(dataframes)
+            st.plotly_chart(results["fig_interactions"], use_container_width=True)
+            st.markdown(results["explanation_interactions"])
 
-            if results:
-                # Organisation des graphiques dans des onglets
-                tab1, tab2, tab3 = st.tabs(["Performance des Posts", "Engagement et Abonnés", "Analyses Avancées"])
+        with tab2:
+            st.plotly_chart(results["fig_engagement"], use_container_width=True)
+            st.markdown(results["explanation_engagement"])
 
-                with tab1:
-                    st.plotly_chart(results["fig_posts"], use_container_width=True)
-                    st.markdown(results["explanation_posts"])
+            st.plotly_chart(results["fig_subscribers"], use_container_width=True)
+            st.markdown(results["explanation_subscribers"])
 
-                    st.plotly_chart(results["fig_impressions"], use_container_width=True)
-                    st.markdown(results["explanation_impressions"])
+            st.plotly_chart(results["fig_corr_abonnes_engagement"], use_container_width=True)
+            st.markdown(results["explanation_corr_abonnes_engagement"])
 
-                    st.plotly_chart(results["fig_interactions"], use_container_width=True)
-                    st.markdown(results["explanation_interactions"])
+            st.plotly_chart(results["fig_growth_peaks"], use_container_width=True)
+            st.markdown(results["explanation_growth_peaks"])
 
-                with tab2:
-                    st.plotly_chart(results["fig_engagement"], use_container_width=True)
-                    st.markdown(results["explanation_engagement"])
+        with tab3:
+            st.header("Matrice de Corrélation")
+            st.plotly_chart(results["fig_corr_matrix"], use_container_width=True)
+            st.markdown(results["explanation_corr_matrix"])
 
-                    st.plotly_chart(results["fig_subscribers"], use_container_width=True)
-                    st.markdown(results["explanation_subscribers"])
+            st.header("Corrélations Supplémentaires")
+            st.plotly_chart(results["fig_corr_inter_impr"], use_container_width=True)
+            st.markdown(results["explanation_corr_inter_impr"])
 
-                    st.plotly_chart(results["fig_corr_abonnes_engagement"], use_container_width=True)
-                    st.markdown(results["explanation_corr_abonnes_engagement"])
+            st.plotly_chart(results["fig_corr_posts_engagement"], use_container_width=True)
+            st.markdown(results["explanation_corr_posts_engagement"])
 
-                    st.plotly_chart(results["fig_growth_peaks"], use_container_width=True)
-                    st.markdown(results["explanation_growth_peaks"])
+            st.header("Régression Linéaire pour le Taux d'Engagement")
+            st.plotly_chart(results["fig_regression"], use_container_width=True)
+            st.markdown(results["explanation_regression"])
 
-                with tab3:
-                    st.header("Matrice de Corrélation")
-                    st.plotly_chart(results["fig_corr_matrix"], use_container_width=True)
-                    st.markdown(results["explanation_corr_matrix"])
+            st.header("Indicateurs Clés de Performance (KPI)")
+            kpi1, kpi2, kpi3 = st.columns(3)
+            kpi1.metric("Taux d'Engagement Moyen", f"{results['kpi_mean_engagement_rate']:.2f}%")
+            kpi2.metric("Croissance Moyenne des Abonnés", f"{results['kpi_mean_growth_rate']:.2f}%")
+            kpi3.metric("Total des Interactions", f"{results['kpi_total_interactions']}")
 
-                    st.header("Corrélations Supplémentaires")
-                    st.plotly_chart(results["fig_corr_inter_impr"], use_container_width=True)
-                    st.markdown(results["explanation_corr_inter_impr"])
+            st.header("Recommandations Basées sur les Analyses")
+            st.markdown(results["recommendations"])
 
-                    st.plotly_chart(results["fig_corr_posts_engagement"], use_container_width=True)
-                    st.markdown(results["explanation_corr_posts_engagement"])
+            st.header("Données Démographiques")
+            for category, fig in results["demographics_figures"].items():
+                st.plotly_chart(fig, use_container_width=True)
 
-                    st.header("Régression Linéaire")
-                    st.plotly_chart(results["fig_regression"], use_container_width=True)
-                    st.markdown(results["explanation_regression"])
-
-                    # Ajouter des graphiques démographiques
-                    st.header("Données Démographiques")
-                    for category, fig in results["demographics_figures"].items():
-                        st.plotly_chart(fig, use_container_width=True)
-
-                    # Afficher les KPI
-                    st.header("KPI Clés")
-                    col1, col2, col3 = st.columns(3)
-                    col1.metric("Taux d'Engagement Moyen (%)", f"{results['kpi_mean_engagement_rate']:.2f}")
-                    col2.metric("Taux de Croissance Moyen (%)", f"{results['kpi_mean_growth_rate']:.2f}")
-                    col3.metric("Total des Interactions", f"{int(results['kpi_total_interactions'])}")
-
-                    # Afficher les recommandations
-                    st.header("Recommandations")
-                    st.markdown(results["recommendations"])
-
-                    # Option de téléchargement
-                    csv = convert_df(results["combined_df"])
-                    st.download_button(
-                        label="Télécharger les Données CSV",
-                        data=csv,
-                        file_name='combined_data.csv',
-                        mime='text/csv',
-                    )
-        except Exception as e:
-            st.error(f"Une erreur est survenue lors de la génération des graphiques : {e}")
+            # Option pour télécharger les données analysées
+            st.header("Télécharger les Données Analytiques")
+            csv = convert_df(results["combined_df"])
+            st.download_button(
+                label="Télécharger les Données Analytiques",
+                data=csv,
+                file_name='analyse_linkedin.csv',
+                mime='text/csv',
+            )
+    else:
+        st.error("Erreur dans la génération des graphiques. Veuillez vérifier vos données.")
+else:
+    st.info("Veuillez télécharger un fichier Excel pour commencer l'analyse.")
