@@ -38,10 +38,14 @@ def generate_performance_graphs(excel_data, time_granularity):
         # Extraire le texte de la cellule A1
         total_subscribers_text = abonnés_df_full.iloc[0, 0]
 
+        # Afficher le contenu pour le débogage
+        st.write("Contenu de la cellule A1 :", total_subscribers_text)
+
         # Utiliser une expression régulière pour extraire le nombre total d'abonnés
-        match = re.search(r'(\d+)$', str(total_subscribers_text))
+        match = re.search(r'([\d\s]+)$', str(total_subscribers_text))
         if match:
-            total_subscribers = int(match.group(1))
+            total_subscribers_str = match.group(1).replace(" ", "")
+            total_subscribers = int(total_subscribers_str)
         else:
             total_subscribers = None  # Gérer l'erreur si nécessaire
 
@@ -138,9 +142,6 @@ def generate_performance_graphs(excel_data, time_granularity):
                            labels={'Posts per Period': 'Nombre de posts'},
                            template='plotly_dark')
 
-        # Ajout des graphiques démographiques (inchangés)
-        # ... [Code pour les graphiques démographiques] ...
-
         # Retourner les chiffres clés et les figures
         return (total_subscribers, average_engagement_rate, total_impressions, total_interactions, average_subscriber_growth,
                 fig_posts, fig_impressions, fig_interactions, fig_engagement, fig_subscribers)
@@ -172,7 +173,11 @@ if uploaded_file is not None:
 
         col1, col2, col3, col4, col5 = st.columns(5)
 
-        col1.metric("Total Abonnés", f"{int(total_subscribers):,}".replace(",", " "))
+        if total_subscribers is not None:
+            col1.metric("Total Abonnés", f"{total_subscribers:,}".replace(",", " "))
+        else:
+            col1.metric("Total Abonnés", "Données non disponibles")
+
         col2.metric("Taux d'Engagement Moyen", f"{average_engagement_rate:.2f}%")
         col3.metric("Total Impressions", f"{int(total_impressions):,}".replace(",", " "))
         col4.metric("Total Interactions", f"{int(total_interactions):,}".replace(",", " "))
@@ -192,9 +197,10 @@ if uploaded_file is not None:
             # Ajouter d'autres graphiques liés aux posts si nécessaire
 
         with tab3:
-            # Afficher les graphiques démographiques
-            for category, fig in demographics_figures.items():
-                st.plotly_chart(fig, use_container_width=True)
+            # Afficher les graphiques démographiques si disponibles
+            st.write("Graphiques démographiques non inclus dans cet exemple.")
+            # for category, fig in demographics_figures.items():
+            #     st.plotly_chart(fig, use_container_width=True)
 
     else:
         st.error("Erreur dans la génération des graphiques.")
