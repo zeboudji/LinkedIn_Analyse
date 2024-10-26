@@ -49,46 +49,74 @@ def generate_performance_graphs(excel_data):
         demographics_df.columns = demographics_df.columns.str.strip()
 
         # Renommer les colonnes de manière dynamique si nécessaire
-        # Ici, nous supposons que les colonnes essentielles sont présentes après le nettoyage
-        engagement_df = rename_columns(engagement_df, {
+        # Ici, ajustez le mapping selon vos données réelles
+        mapping_engagement = {
             'Date Originale': 'Date',  # Exemple de mapping, ajustez selon vos données
             'Interactions Original': 'Interactions',
             'Impressions Original': 'Impressions'
-        })
-        abonnes_df = rename_columns(abonnes_df, {
+        }
+        mapping_abonnes = {
             'Date Originale': 'Date',
             'Nouveaux abonnés Original': 'Nouveaux abonnés'
-        })
-        meilleurs_posts_df = rename_columns(meilleurs_posts_df, {
+        }
+        mapping_meilleurs_posts = {
             'Date de publication Originale': 'Date de publication',
             'Interactions Originales': 'Interactions'
-        })
-        demographics_df = rename_columns(demographics_df, {
+        }
+        mapping_demographics = {
             'Principales données démographiques Originale': 'Principales données démographiques',
             'Valeur Originale': 'Valeur',
             'Pourcentage Original': 'Pourcentage'
-        })
+        }
+
+        engagement_df = rename_columns(engagement_df, mapping_engagement)
+        abonnes_df = rename_columns(abonnes_df, mapping_abonnes)
+        meilleurs_posts_df = rename_columns(meilleurs_posts_df, mapping_meilleurs_posts)
+        demographics_df = rename_columns(demographics_df, mapping_demographics)
+
+        # Vérification des colonnes essentielles après renommage
+        essential_columns = {
+            'ENGAGEMENT': ['Date', 'Interactions', 'Impressions'],
+            'ABONNÉS': ['Date', 'Nouveaux abonnés'],
+            'MEILLEURS POSTS': ['Date de publication', 'Interactions'],
+            'DONNÉES DÉMOGRAPHIQUES': ['Principales données démographiques', 'Valeur', 'Pourcentage']
+        }
+
+        for sheet, cols in essential_columns.items():
+            for col in cols:
+                if col not in locals()[f"{sheet.lower()}_df"].columns:
+                    st.warning(f"La colonne '{col}' est manquante dans la feuille '{sheet}'. Certaines analyses pourraient être affectées.")
 
         # Nettoyer les données des posts
-        meilleurs_posts_df.columns = ['Date de publication', 'Interactions']
         meilleurs_posts_df['Date de publication'] = pd.to_datetime(meilleurs_posts_df['Date de publication'], format='%d/%m/%Y', errors='coerce')
         meilleurs_posts_df['Interactions'] = pd.to_numeric(meilleurs_posts_df['Interactions'], errors='coerce')
+
+        # Gérer les valeurs NaN après conversion
+        meilleurs_posts_df = meilleurs_posts_df.dropna(subset=['Date de publication', 'Interactions'])
+
+        if meilleurs_posts_df.empty:
+            st.warning("Le DataFrame 'MEILLEURS POSTS' est vide après nettoyage. Aucune donnée à afficher pour les meilleurs posts.")
+
         posts_per_day = meilleurs_posts_df['Date de publication'].value_counts().sort_index()
 
         # Nettoyer le dataframe des abonnés et calculer les abonnés cumulés
-        abonnes_df_clean = abonnes_df.dropna()
-        # Vérifier le nom exact de la colonne Date dans abonnes_df_clean
-        date_column_abonnes = [col for col in abonnes_df_clean.columns if 'Date' in col][0]
-        abonnes_df_clean.rename(columns={date_column_abonnes: 'Date'}, inplace=True)
+        abonnes_df_clean = abonnes_df.dropna(subset=['Date', 'Nouveaux abonnés'])
         abonnes_df_clean['Date'] = pd.to_datetime(abonnes_df_clean['Date'], format='%d/%m/%Y', errors='coerce')
         abonnes_df_clean['Nouveaux abonnés'] = pd.to_numeric(abonnes_df_clean['Nouveaux abonnés'], errors='coerce')
+        abonnes_df_clean = abonnes_df_clean.dropna(subset=['Date', 'Nouveaux abonnés'])
         abonnes_df_clean['Cumulative Subscribers'] = abonnes_df_clean['Nouveaux abonnés'].cumsum()
+
+        if abonnes_df_clean.empty:
+            st.warning("Le DataFrame 'ABONNÉS' est vide après nettoyage. Aucune donnée à afficher pour les abonnés.")
 
         # Calculer le taux d'engagement
         engagement_df['Interactions'] = pd.to_numeric(engagement_df['Interactions'], errors='coerce')
         engagement_df['Impressions'] = pd.to_numeric(engagement_df['Impressions'], errors='coerce')
         engagement_df['Date'] = pd.to_datetime(engagement_df['Date'], format='%d/%m/%Y', errors='coerce')
         engagement_df['Engagement Rate (%)'] = (engagement_df['Interactions'] / engagement_df['Impressions']) * 100
+
+        # Gérer les NaN dans les taux d'engagement
+        engagement_df['Engagement Rate (%)'] = engagement_df['Engagement Rate (%)'].fillna(0)
 
         # Combiner les données pour le traçage
         combined_df = pd.merge(engagement_df, abonnes_df_clean, on='Date', how='left')
@@ -103,11 +131,16 @@ def generate_performance_graphs(excel_data):
         combined_df['Growth Rate'] = combined_df['Growth Rate'].fillna(0)
 
         # Extraire les dates de début et de fin
-        start_date = combined_df['Date'].min().strftime('%d/%m/%Y')
-        end_date = combined_df['Date'].max().strftime('%d/%m/%Y')
+        start_date = combined_df['Date'].min().strftime('%d/%m/%Y') if not combined_df['Date'].isnull().all() else 'N/A'
+        end_date = combined_df['Date'].max().strftime('%d/%m/%Y') if not combined_df['Date'].isnull().all() else 'N/A'
 
         # Mettre à jour le titre de l'application avec la période d'analyse
         st.title(f"Analyse des Performances Réseaux Sociaux - LinkedIn ({start_date} - {end_date})")
+
+        # Vérifier si combined_df est vide
+        if combined_df.empty:
+            st.warning("Le DataFrame combiné est vide. Aucune donnée à afficher.")
+            return None
 
         # Graphique 1 : Nombre de posts par jour (Bar Chart)
         fig_posts = px.bar(combined_df, x='Date', y='Posts per Day',
@@ -250,8 +283,13 @@ def generate_performance_graphs(excel_data):
 
         # Graphique 10 : Régression Linéaire pour Prédire le Taux d'Engagement
         def regression_engagement(combined_df):
-            X = combined_df[['Impressions', 'Posts per Day', 'Cumulative Subscribers']]
-            y = combined_df['Engagement Rate (%)']
+            # Sélectionner les colonnes pertinentes et gérer les NaN
+            X = combined_df[['Impressions', 'Posts per Day', 'Cumulative Subscribers']].dropna()
+            y = combined_df.loc[X.index, 'Engagement Rate (%)']
+
+            if X.empty or y.empty:
+                st.warning("Pas assez de données pour effectuer la régression linéaire.")
+                return None, None
 
             model = LinearRegression()
             model.fit(X, y)
@@ -269,11 +307,14 @@ def generate_performance_graphs(excel_data):
         fig_regression, r2_value = regression_engagement(combined_df)
 
         # Explication pour le graphique 10
-        explanation_regression = f"""
-        **Interprétation :** Ce graphique montre la prédiction du taux d'engagement basé sur les impressions, le nombre de posts par jour et le nombre d'abonnés cumulés. 
-        Le coefficient de détermination (R² = {r2_value:.2f}) indique la proportion de la variance du taux d'engagement expliquée par le modèle. 
-        Un R² proche de 1 suggère que le modèle prédit bien le taux d'engagement.
-        """
+        if fig_regression is not None:
+            explanation_regression = f"""
+            **Interprétation :** Ce graphique montre la prédiction du taux d'engagement basé sur les impressions, le nombre de posts par jour et le nombre d'abonnés cumulés. 
+            Le coefficient de détermination (R² = {r2_value:.2f}) indique la proportion de la variance du taux d'engagement expliquée par le modèle. 
+            Un R² proche de 1 suggère que le modèle prédit bien le taux d'engagement.
+            """
+        else:
+            explanation_regression = "**Interprétation :** Pas assez de données pour effectuer la régression linéaire."
 
         # Calcul des KPI
         mean_engagement_rate = combined_df['Engagement Rate (%)'].mean()
@@ -296,13 +337,17 @@ def generate_performance_graphs(excel_data):
         demographics_df['Pourcentage'] = demographics_df['Pourcentage'].str.rstrip('%')
         demographics_df['Pourcentage'] = pd.to_numeric(demographics_df['Pourcentage'], errors='coerce')
 
-        demographics_categories = demographics_df['Principales données démographiques'].unique()
+        demographics_categories = demographics_df['Principales données démographiques'].dropna().unique()
 
         # Créer un dictionnaire pour stocker les figures démographiques
         demographics_figures = {}
 
         for category in demographics_categories:
-            df_category = demographics_df[demographics_df['Principales données démographiques'] == category]
+            df_category = demographics_df[demographics_df['Principales données démographiques'] == category].dropna(subset=['Valeur', 'Pourcentage'])
+
+            if df_category.empty:
+                st.warning(f"Aucune donnée valide pour la catégorie démographique '{category}'.")
+                continue
 
             # Trier les valeurs par pourcentage décroissant
             df_category = df_category.sort_values(by='Pourcentage', ascending=False)
