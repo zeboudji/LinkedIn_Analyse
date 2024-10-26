@@ -1,9 +1,8 @@
-# LinkedIn_Stats_Streamlit.py
-
 import pandas as pd
 import streamlit as st
 import plotly.express as px
 import plotly.graph_objects as go
+import plotly.figure_factory as ff
 
 from io import BytesIO
 
@@ -27,6 +26,7 @@ def generate_performance_graphs(excel_data):
         # Nettoyer les données des posts
         meilleurs_posts_df.columns = ['Date de publication', 'Interactions']
         meilleurs_posts_df['Date de publication'] = pd.to_datetime(meilleurs_posts_df['Date de publication'], format='%d/%m/%Y')
+        meilleurs_posts_df['Interactions'] = pd.to_numeric(meilleurs_posts_df['Interactions'], errors='coerce')
         posts_per_day = meilleurs_posts_df['Date de publication'].value_counts().sort_index()
 
         # Nettoyer le dataframe des abonnés et calculer les abonnés cumulés
@@ -38,7 +38,7 @@ def generate_performance_graphs(excel_data):
         engagement_df['Engagement Rate (%)'] = (engagement_df['Interactions'] / engagement_df['Impressions']) * 100
 
         # Combiner les données pour le traçage
-        combined_df = pd.merge(engagement_df, abonnés_df_clean, left_on='Date', right_on='Date', how='left')
+        combined_df = pd.merge(engagement_df, abonnés_df_clean, on='Date', how='left')
         combined_df['Posts per Day'] = combined_df['Date'].map(posts_per_day).fillna(0)
 
         # Conversion des dates pour Plotly
@@ -58,9 +58,9 @@ def generate_performance_graphs(excel_data):
                                   template='plotly_dark')
 
         # Graphique 3 : Interactions au fil du temps (Line Chart)
-        fig_interactions = px.line(combined_df, x='Date', y='Interactions',
+        fig_interactions = px.line(combined_df, x='Date', y='Interactions_x',
                                    title='Interactions au Fil du Temps',
-                                   labels={'Interactions': 'Interactions'},
+                                   labels={'Interactions_x': 'Interactions'},
                                    markers=True,
                                    template='plotly_dark')
 
@@ -91,11 +91,36 @@ def generate_performance_graphs(excel_data):
                                    labels={'Date': 'Date', 'Growth Rate': 'Taux de Croissance (%)'},
                                    markers=True, template='plotly_dark')
 
-        return fig_posts, fig_impressions, fig_interactions, fig_engagement, fig_subscribers, fig_corr_abonnes_engagement, fig_growth_peaks
+        # Graphique 8 : Distribution des interactions par post (Histogramme)
+        fig_interaction_distribution = px.histogram(meilleurs_posts_df, x='Interactions',
+                                                    nbins=50,
+                                                    title='Distribution des Interactions par Post',
+                                                    labels={'Interactions': 'Nombre d\'Interactions'},
+                                                    template='plotly_dark')
+
+        # Graphique 9 : Moyenne mobile du taux d'engagement sur 7 jours
+        combined_df['Rolling Engagement Rate'] = combined_df['Engagement Rate (%)'].rolling(window=7).mean()
+        fig_engagement_rolling = px.line(combined_df, x='Date', y='Rolling Engagement Rate',
+                                         title='Moyenne Mobile du Taux d\'Engagement sur 7 Jours',
+                                         labels={'Rolling Engagement Rate': 'Taux d\'Engagement Moyen (%)'},
+                                         markers=True, template='plotly_dark')
+
+        # Graphique 10 : Matrice de corrélation des métriques (Heatmap)
+        corr_matrix = combined_df[['Impressions', 'Interactions_x', 'Engagement Rate (%)', 'Cumulative Subscribers']].corr()
+        fig_corr_matrix = ff.create_annotated_heatmap(z=corr_matrix.values,
+                                                      x=list(corr_matrix.columns),
+                                                      y=list(corr_matrix.index),
+                                                      colorscale='Viridis',
+                                                      showscale=True)
+        fig_corr_matrix.update_layout(title='Matrice de Corrélation des Métriques')
+
+        return (fig_posts, fig_impressions, fig_interactions, fig_engagement, fig_subscribers,
+                fig_corr_abonnes_engagement, fig_growth_peaks, fig_interaction_distribution,
+                fig_engagement_rolling, fig_corr_matrix)
 
     except Exception as e:
         st.error(f"Une erreur est survenue lors de la génération des graphiques : {e}")
-        return None, None, None, None, None, None, None
+        return [None] * 10
 
 # Interface utilisateur
 st.sidebar.header("Paramètres")
@@ -104,9 +129,11 @@ uploaded_file = st.sidebar.file_uploader("Sélectionnez un fichier Excel", type=
 
 if uploaded_file is not None:
     # Appel de la fonction avec gestion des exceptions
-    fig_posts, fig_impressions, fig_interactions, fig_engagement, fig_subscribers, fig_corr_abonnes_engagement, fig_growth_peaks = generate_performance_graphs(uploaded_file)
+    (fig_posts, fig_impressions, fig_interactions, fig_engagement, fig_subscribers,
+     fig_corr_abonnes_engagement, fig_growth_peaks, fig_interaction_distribution,
+     fig_engagement_rolling, fig_corr_matrix) = generate_performance_graphs(uploaded_file)
 
-    if fig_posts and fig_impressions and fig_interactions and fig_engagement and fig_subscribers:
+    if all([fig_posts, fig_impressions, fig_interactions, fig_engagement, fig_subscribers]):
         # Organisation des graphiques dans des onglets
         tab1, tab2, tab3 = st.tabs(["Performance des Posts", "Engagement et Abonnés", "Analyses Supplémentaires"])
 
@@ -118,9 +145,12 @@ if uploaded_file is not None:
         with tab2:
             st.plotly_chart(fig_engagement, use_container_width=True)
             st.plotly_chart(fig_subscribers, use_container_width=True)
+            st.plotly_chart(fig_engagement_rolling, use_container_width=True)
 
         with tab3:
             st.plotly_chart(fig_corr_abonnes_engagement, use_container_width=True)
             st.plotly_chart(fig_growth_peaks, use_container_width=True)
+            st.plotly_chart(fig_interaction_distribution, use_container_width=True)
+            st.plotly_chart(fig_corr_matrix, use_container_width=True)
 else:
     st.info("Veuillez télécharger un fichier Excel pour commencer l'analyse.")
