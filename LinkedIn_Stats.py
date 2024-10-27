@@ -348,8 +348,7 @@ if uploaded_file is not None:
 
             st.plotly_chart(results["fig_growth_peaks"], use_container_width=True)
             st.markdown(results["explanation_growth_peaks"])
-
-        with tab3:
+    with tab3:
             st.header("Matrice de Corrélation")
             st.plotly_chart(results["fig_corr_matrix"], use_container_width=True)
             st.markdown(results["explanation_corr_matrix"])
@@ -358,4 +357,36 @@ if uploaded_file is not None:
             st.plotly_chart(results["fig_corr_inter_impr"], use_container_width=True)
             st.markdown(results["explanation_corr_inter_impr"])
 
-            st.plotly_chart(res
+            st.plotly_chart(results["fig_corr_posts_engagement"], use_container_width=True)
+            st.markdown(results["explanation_corr_posts_engagement"])
+
+            st.header("Régression Linéaire pour le Taux d'Engagement")
+            st.plotly_chart(results["fig_regression"], use_container_width=True)
+            st.markdown(results["explanation_regression"])
+
+            st.header("Indicateurs Clés de Performance (KPI)")
+            kpi1, kpi2, kpi3 = st.columns(3)
+            kpi1.metric("Taux d'Engagement Moyen", f"{results['kpi_mean_engagement_rate']:.2f}%")
+            kpi2.metric("Croissance Moyenne des Abonnés", f"{results['kpi_mean_growth_rate']:.2f}%")
+            kpi3.metric("Total des Interactions", f"{results['kpi_total_interactions']}")
+
+            st.header("Recommandations Basées sur les Analyses")
+            st.markdown(results["recommendations"])
+
+            st.header("Données Démographiques")
+            for category, fig in results["demographics_figures"].items():
+                st.plotly_chart(fig, use_container_width=True)
+
+            # Option pour télécharger les données analysées
+            st.header("Télécharger les Données Analytiques")
+            csv = convert_df(results["combined_df"])
+            st.download_button(
+                label="Télécharger les Données Analytiques",
+                data=csv,
+                file_name='analyse_linkedin.csv',
+                mime='text/csv',
+            )
+    else:
+        st.error("Erreur dans la génération des graphiques. Veuillez vérifier vos données.")
+else:
+    st.info("Veuillez télécharger un fichier Excel pour commencer l'analyse.")
