@@ -31,11 +31,6 @@ def generate_performance_graphs(excel_data):
         meilleurs_posts_df.columns = meilleurs_posts_df.columns.str.strip()
         demographics_df.columns = demographics_df.columns.str.strip()
 
-        # Vérifier si des données sont manquantes dans les dataframes critiques
-        if engagement_df.isnull().values.any() or abonnes_df.isnull().values.any() or meilleurs_posts_df.isnull().values.any() or demographics_df.isnull().values.any():
-            st.error("Des données sont manquantes dans le fichier Excel. Veuillez vérifier que toutes les données nécessaires sont présentes avant de procéder à l'analyse.")
-            return None
-
         # Nettoyer les données des posts
         meilleurs_posts_df.columns = ['Date de publication', 'Interactions']
         meilleurs_posts_df['Date de publication'] = pd.to_datetime(meilleurs_posts_df['Date de publication'], format='%d/%m/%Y', errors='coerce')
@@ -262,6 +257,7 @@ def generate_performance_graphs(excel_data):
         demographics_df['Pourcentage'].replace('nan', pd.NA, inplace=True)
         demographics_df['Pourcentage'] = demographics_df['Pourcentage'].str.rstrip('%')
         demographics_df['Pourcentage'] = pd.to_numeric(demographics_df['Pourcentage'], errors='coerce')
+
         demographics_categories = demographics_df['Principales données démographiques'].unique()
 
         # Créer un dictionnaire pour stocker les figures démographiques
@@ -352,3 +348,14 @@ if uploaded_file is not None:
 
             st.plotly_chart(results["fig_growth_peaks"], use_container_width=True)
             st.markdown(results["explanation_growth_peaks"])
+
+        with tab3:
+            st.header("Matrice de Corrélation")
+            st.plotly_chart(results["fig_corr_matrix"], use_container_width=True)
+            st.markdown(results["explanation_corr_matrix"])
+
+            st.header("Corrélations Supplémentaires")
+            st.plotly_chart(results["fig_corr_inter_impr"], use_container_width=True)
+            st.markdown(results["explanation_corr_inter_impr"])
+
+            st.plotly_chart(res
