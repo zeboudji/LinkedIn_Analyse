@@ -348,7 +348,8 @@ if uploaded_file is not None:
 
             st.plotly_chart(results["fig_growth_peaks"], use_container_width=True)
             st.markdown(results["explanation_growth_peaks"])
-    with tab3:
+
+        with tab3:
             st.header("Matrice de Corrélation")
             st.plotly_chart(results["fig_corr_matrix"], use_container_width=True)
             st.markdown(results["explanation_corr_matrix"])
