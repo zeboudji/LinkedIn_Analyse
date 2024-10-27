@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 import streamlit as st
 import plotly.express as px
 import plotly.figure_factory as ff
@@ -53,20 +54,24 @@ def generate_performance_graphs(excel_data):
         engagement_df['Interactions'] = pd.to_numeric(engagement_df['Interactions'], errors='coerce').fillna(0)
         engagement_df['Impressions'] = pd.to_numeric(engagement_df['Impressions'], errors='coerce').fillna(0)
         engagement_df['Date'] = pd.to_datetime(engagement_df['Date'], format='%d/%m/%Y', errors='coerce')
-        # Remplacer les impressions à zéro pour éviter la division par zéro
-        engagement_df['Impressions'] = engagement_df['Impressions'].replace(0, pd.NA)
+        # Remplacer les impressions à zéro par np.nan pour éviter la division par zéro
+        engagement_df['Impressions'] = engagement_df['Impressions'].replace(0, np.nan)
+        # Calculer le taux d'engagement en gérant les NaN
         engagement_df['Engagement Rate (%)'] = (engagement_df['Interactions'] / engagement_df['Impressions']) * 100
         engagement_df['Engagement Rate (%)'] = engagement_df['Engagement Rate (%)'].fillna(0)
 
         # Combiner les données pour le traçage
         combined_df = pd.merge(engagement_df, abonnes_df_clean, on='Date', how='left')
         combined_df['Posts per Day'] = combined_df['Date'].map(posts_per_day).fillna(0)
+        combined_df['Posts per Day'] = combined_df['Posts per Day'].astype(int)
 
         # Conversion des dates pour Plotly
         combined_df['Date'] = pd.to_datetime(combined_df['Date'])
 
         # Calculer le taux de croissance des abonnés
+        abonnes_df_clean.sort_values('Date', inplace=True)
         abonnes_df_clean['Growth Rate'] = abonnes_df_clean['Nouveaux abonnés'].pct_change().fillna(0) * 100  # En pourcentage
+        # Fusionner 'Growth Rate' dans combined_df
         combined_df = pd.merge(combined_df, abonnes_df_clean[['Date', 'Growth Rate']], on='Date', how='left')
         combined_df['Growth Rate'] = combined_df['Growth Rate'].fillna(0)
 
@@ -143,7 +148,9 @@ def generate_performance_graphs(excel_data):
         """
 
         # Graphique 6 : Corrélation entre abonnés cumulés et taux d'engagement (Scatter Plot)
-        fig_corr_abonnes_engagement = px.scatter(combined_df, x='Cumulative Subscribers', y='Engagement Rate (%)',
+        # Avant de tracer, supprimer les lignes avec des valeurs manquantes dans les variables utilisées
+        corr_df = combined_df.dropna(subset=['Cumulative Subscribers', 'Engagement Rate (%)'])
+        fig_corr_abonnes_engagement = px.scatter(corr_df, x='Cumulative Subscribers', y='Engagement Rate (%)',
                                                  title="Corrélation entre Abonnés Cumulés et Taux d'Engagement",
                                                  labels={'Cumulative Subscribers': 'Abonnés Cumulés', 'Engagement Rate (%)': 'Taux d\'Engagement (%)'},
                                                  trendline="ols", template='plotly_dark')
@@ -192,7 +199,9 @@ def generate_performance_graphs(excel_data):
         """
 
         # Graphique 9a : Corrélation entre Impressions et Interactions
-        fig_corr_inter_impr = px.scatter(combined_df, x='Impressions', y='Interactions',
+        # Avant de tracer, supprimer les lignes avec des valeurs manquantes dans les variables utilisées
+        corr_df_ia = combined_df.dropna(subset=['Impressions', 'Interactions'])
+        fig_corr_inter_impr = px.scatter(corr_df_ia, x='Impressions', y='Interactions',
                                          title="Corrélation entre Impressions et Interactions",
                                          labels={'Impressions': 'Impressions', 'Interactions': 'Interactions'},
                                          trendline="ols", template='plotly_dark')
@@ -205,7 +214,9 @@ def generate_performance_graphs(excel_data):
         """
 
         # Graphique 9b : Corrélation entre Posts par Jour et Taux d'Engagement
-        fig_corr_posts_engagement = px.scatter(combined_df, x='Posts per Day', y='Engagement Rate (%)',
+        # Avant de tracer, supprimer les lignes avec des valeurs manquantes dans les variables utilisées
+        corr_df_pe = combined_df.dropna(subset=['Posts per Day', 'Engagement Rate (%)'])
+        fig_corr_posts_engagement = px.scatter(corr_df_pe, x='Posts per Day', y='Engagement Rate (%)',
                                                title="Corrélation entre Nombre de Posts et Taux d'Engagement",
                                                labels={'Posts per Day': 'Nombre de Posts par Jour', 'Engagement Rate (%)': 'Taux d\'Engagement (%)'},
                                                trendline="ols", template='plotly_dark')
@@ -221,6 +232,10 @@ def generate_performance_graphs(excel_data):
             # Remplacer les valeurs manquantes dans les variables explicatives
             X = combined_df[['Impressions', 'Posts per Day', 'Cumulative Subscribers']].fillna(0)
             y = combined_df['Engagement Rate (%)'].fillna(0)
+
+            # S'assurer que X et y sont de types numériques
+            X = X.apply(pd.to_numeric, errors='coerce').fillna(0)
+            y = pd.to_numeric(y, errors='coerce').fillna(0)
 
             model = LinearRegression()
             model.fit(X, y)
@@ -261,7 +276,7 @@ def generate_performance_graphs(excel_data):
         # Ajout des graphiques démographiques
         # Nettoyer les données démographiques
         demographics_df['Pourcentage'] = demographics_df['Pourcentage'].astype(str)
-        demographics_df['Pourcentage'].replace('nan', pd.NA, inplace=True)
+        demographics_df['Pourcentage'].replace('nan', np.nan, inplace=True)
         demographics_df['Pourcentage'] = demographics_df['Pourcentage'].str.rstrip('%')
         demographics_df['Pourcentage'] = pd.to_numeric(demographics_df['Pourcentage'], errors='coerce')
         demographics_df['Pourcentage'] = demographics_df['Pourcentage'].fillna(0)
@@ -285,7 +300,7 @@ def generate_performance_graphs(excel_data):
             fig.update_layout(xaxis_tickangle=-45)
             demographics_figures[category] = fig
 
-        # Prepare the return dict
+        # Préparer le dictionnaire de retour
         return {
             "fig_posts": fig_posts,
             "explanation_posts": explanation_posts,
@@ -324,29 +339,4 @@ def generate_performance_graphs(excel_data):
 # Interface utilisateur
 st.sidebar.header("Paramètres")
 
-uploaded_file = st.sidebar.file_uploader("Sélectionnez un fichier Excel", type=["xlsx", "xls"])
-
-if uploaded_file is not None:
-    # Appel de la fonction avec gestion des exceptions
-    results = generate_performance_graphs(uploaded_file)
-
-    if results:
-        # Organisation des graphiques dans des onglets
-        tab1, tab2, tab3 = st.tabs(["Performance des Posts", "Engagement et Abonnés", "Analyses Avancées"])
-
-        with tab1:
-            st.plotly_chart(results["fig_posts"], use_container_width=True)
-            st.markdown(results["explanation_posts"])
-
-            st.plotly_chart(results["fig_impressions"], use_container_width=True)
-            st.markdown(results["explanation_impressions"])
-
-            st.plotly_chart(results["fig_interactions"], use_container_width=True)
-            st.markdown(results["explanation_interactions"])
-
-        with tab2:
-            st.plotly_chart(results["fig_engagement"], use_container_width=True)
-            st.markdown(results["explanation_engagement"])
-
-            st.plotly_chart(results["fig_subscribers"], use_container_width=True)
-    
+uploaded_file = st.sidebar.file_uploader("Sélectionne
