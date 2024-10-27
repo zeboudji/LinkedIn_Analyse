@@ -36,44 +36,52 @@ def generate_performance_graphs(excel_data):
         meilleurs_posts_df.columns = ['Date de publication', 'Interactions']
         meilleurs_posts_df['Date de publication'] = pd.to_datetime(meilleurs_posts_df['Date de publication'], format='%d/%m/%Y', errors='coerce')
         meilleurs_posts_df['Interactions'] = pd.to_numeric(meilleurs_posts_df['Interactions'], errors='coerce')
-        # Gérer les valeurs manquantes en supprimant les lignes avec des dates manquantes
+        # Supprimer les lignes avec des dates manquantes
         meilleurs_posts_df = meilleurs_posts_df.dropna(subset=['Date de publication'])
+        # Supprimer les lignes avec des interactions manquantes
+        meilleurs_posts_df = meilleurs_posts_df.dropna(subset=['Interactions'])
         posts_per_day = meilleurs_posts_df['Date de publication'].value_counts().sort_index()
 
         # Nettoyer le dataframe des abonnés et calculer les abonnés cumulés
-        # Gérer les valeurs manquantes en supprimant les lignes où 'Date' ou 'Nouveaux abonnés' est manquant
+        # Vérifier le nom exact de la colonne Date dans abonnes_df
+        date_column_abonnes = [col for col in abonnes_df.columns if 'Date' in col][0]
+        abonnes_df.rename(columns={date_column_abonnes: 'Date'}, inplace=True)
+        abonnes_df['Date'] = pd.to_datetime(abonnes_df['Date'], format='%d/%m/%Y', errors='coerce')
+        abonnes_df['Nouveaux abonnés'] = pd.to_numeric(abonnes_df['Nouveaux abonnés'], errors='coerce')
+        # Supprimer les lignes avec des dates ou nouveaux abonnés manquants
         abonnes_df_clean = abonnes_df.dropna(subset=['Date', 'Nouveaux abonnés'])
-        # Vérifier le nom exact de la colonne Date dans abonnes_df_clean
-        date_column_abonnes = [col for col in abonnes_df_clean.columns if 'Date' in col][0]
-        abonnes_df_clean.rename(columns={date_column_abonnes: 'Date'}, inplace=True)
-        abonnes_df_clean['Date'] = pd.to_datetime(abonnes_df_clean['Date'], format='%d/%m/%Y', errors='coerce')
-        abonnes_df_clean['Nouveaux abonnés'] = pd.to_numeric(abonnes_df_clean['Nouveaux abonnés'], errors='coerce').fillna(0)
+        abonnes_df_clean.sort_values('Date', inplace=True)
         abonnes_df_clean['Cumulative Subscribers'] = abonnes_df_clean['Nouveaux abonnés'].cumsum()
 
         # Calculer le taux d'engagement
-        engagement_df['Interactions'] = pd.to_numeric(engagement_df['Interactions'], errors='coerce').fillna(0)
-        engagement_df['Impressions'] = pd.to_numeric(engagement_df['Impressions'], errors='coerce').fillna(0)
+        engagement_df['Interactions'] = pd.to_numeric(engagement_df['Interactions'], errors='coerce')
+        engagement_df['Impressions'] = pd.to_numeric(engagement_df['Impressions'], errors='coerce')
         engagement_df['Date'] = pd.to_datetime(engagement_df['Date'], format='%d/%m/%Y', errors='coerce')
+        # Supprimer les lignes avec des valeurs manquantes
+        engagement_df = engagement_df.dropna(subset=['Date', 'Interactions', 'Impressions'])
         # Remplacer les impressions à zéro par np.nan pour éviter la division par zéro
-        engagement_df['Impressions'] = engagement_df['Impressions'].replace(0, np.nan)
-        # Calculer le taux d'engagement en gérant les NaN
+        engagement_df.loc[engagement_df['Impressions'] == 0, 'Impressions'] = np.nan
+        # Calculer le taux d'engagement
         engagement_df['Engagement Rate (%)'] = (engagement_df['Interactions'] / engagement_df['Impressions']) * 100
-        engagement_df['Engagement Rate (%)'] = engagement_df['Engagement Rate (%)'].fillna(0)
+        # Remplacer les valeurs infinies ou NaN par zéro
+        engagement_df['Engagement Rate (%)'] = engagement_df['Engagement Rate (%)'].replace([np.inf, -np.inf], np.nan).fillna(0)
 
         # Combiner les données pour le traçage
-        combined_df = pd.merge(engagement_df, abonnes_df_clean, on='Date', how='left')
+        combined_df = pd.merge(engagement_df, abonnes_df_clean[['Date', 'Cumulative Subscribers']], on='Date', how='left')
+        combined_df = pd.merge(combined_df, abonnes_df_clean[['Date', 'Nouveaux abonnés']], on='Date', how='left')
         combined_df['Posts per Day'] = combined_df['Date'].map(posts_per_day).fillna(0)
         combined_df['Posts per Day'] = combined_df['Posts per Day'].astype(int)
 
-        # Conversion des dates pour Plotly
-        combined_df['Date'] = pd.to_datetime(combined_df['Date'])
-
         # Calculer le taux de croissance des abonnés
-        abonnes_df_clean.sort_values('Date', inplace=True)
         abonnes_df_clean['Growth Rate'] = abonnes_df_clean['Nouveaux abonnés'].pct_change().fillna(0) * 100  # En pourcentage
         # Fusionner 'Growth Rate' dans combined_df
         combined_df = pd.merge(combined_df, abonnes_df_clean[['Date', 'Growth Rate']], on='Date', how='left')
         combined_df['Growth Rate'] = combined_df['Growth Rate'].fillna(0)
+
+        # S'assurer que toutes les colonnes numériques sont du bon type et sans valeurs manquantes
+        numeric_cols = ['Interactions', 'Impressions', 'Engagement Rate (%)', 'Cumulative Subscribers', 'Growth Rate', 'Posts per Day', 'Nouveaux abonnés']
+        combined_df[numeric_cols] = combined_df[numeric_cols].apply(pd.to_numeric, errors='coerce')
+        combined_df = combined_df.dropna(subset=numeric_cols)
 
         # **Extraire les dates de début et de fin**
         start_date = combined_df['Date'].min().strftime('%d/%m/%Y')
@@ -148,7 +156,6 @@ def generate_performance_graphs(excel_data):
         """
 
         # Graphique 6 : Corrélation entre abonnés cumulés et taux d'engagement (Scatter Plot)
-        # Avant de tracer, supprimer les lignes avec des valeurs manquantes dans les variables utilisées
         corr_df = combined_df.dropna(subset=['Cumulative Subscribers', 'Engagement Rate (%)'])
         fig_corr_abonnes_engagement = px.scatter(corr_df, x='Cumulative Subscribers', y='Engagement Rate (%)',
                                                  title="Corrélation entre Abonnés Cumulés et Taux d'Engagement",
@@ -174,7 +181,6 @@ def generate_performance_graphs(excel_data):
         """
 
         # Graphique 8 : Matrice de Corrélation (Heatmap)
-        numeric_cols = ['Interactions', 'Impressions', 'Engagement Rate (%)', 'Cumulative Subscribers', 'Growth Rate', 'Posts per Day']
         corr_matrix = combined_df[numeric_cols].corr().fillna(0)
 
         fig_corr_matrix = ff.create_annotated_heatmap(
@@ -199,7 +205,6 @@ def generate_performance_graphs(excel_data):
         """
 
         # Graphique 9a : Corrélation entre Impressions et Interactions
-        # Avant de tracer, supprimer les lignes avec des valeurs manquantes dans les variables utilisées
         corr_df_ia = combined_df.dropna(subset=['Impressions', 'Interactions'])
         fig_corr_inter_impr = px.scatter(corr_df_ia, x='Impressions', y='Interactions',
                                          title="Corrélation entre Impressions et Interactions",
@@ -214,7 +219,6 @@ def generate_performance_graphs(excel_data):
         """
 
         # Graphique 9b : Corrélation entre Posts par Jour et Taux d'Engagement
-        # Avant de tracer, supprimer les lignes avec des valeurs manquantes dans les variables utilisées
         corr_df_pe = combined_df.dropna(subset=['Posts per Day', 'Engagement Rate (%)'])
         fig_corr_posts_engagement = px.scatter(corr_df_pe, x='Posts per Day', y='Engagement Rate (%)',
                                                title="Corrélation entre Nombre de Posts et Taux d'Engagement",
@@ -230,23 +234,33 @@ def generate_performance_graphs(excel_data):
         # Graphique 10 : Régression Linéaire pour Prédire le Taux d'Engagement
         def regression_engagement(combined_df):
             # Remplacer les valeurs manquantes dans les variables explicatives
-            X = combined_df[['Impressions', 'Posts per Day', 'Cumulative Subscribers']].fillna(0)
-            y = combined_df['Engagement Rate (%)'].fillna(0)
+            X = combined_df[['Impressions', 'Posts per Day', 'Cumulative Subscribers']]
+            y = combined_df['Engagement Rate (%)']
+
+            # Supprimer les lignes avec des valeurs manquantes
+            regression_df = pd.concat([X, y], axis=1).dropna()
+            X_clean = regression_df[['Impressions', 'Posts per Day', 'Cumulative Subscribers']]
+            y_clean = regression_df['Engagement Rate (%)']
 
             # S'assurer que X et y sont de types numériques
-            X = X.apply(pd.to_numeric, errors='coerce').fillna(0)
-            y = pd.to_numeric(y, errors='coerce').fillna(0)
+            X_clean = X_clean.apply(pd.to_numeric, errors='coerce')
+            y_clean = pd.to_numeric(y_clean, errors='coerce')
+
+            # Vérifier s'il y a encore des valeurs manquantes après conversion
+            regression_df = pd.concat([X_clean, y_clean], axis=1).dropna()
+            X_clean = regression_df[['Impressions', 'Posts per Day', 'Cumulative Subscribers']]
+            y_clean = regression_df['Engagement Rate (%)']
 
             model = LinearRegression()
-            model.fit(X, y)
-            predictions = model.predict(X)
+            model.fit(X_clean, y_clean)
+            predictions = model.predict(X_clean)
 
-            r2 = r2_score(y, predictions)
+            r2 = r2_score(y_clean, predictions)
 
-            fig = px.scatter(x=y, y=predictions, labels={'x': 'Taux d\'Engagement Réel (%)', 'y': 'Taux d\'Engagement Prévu (%)'},
+            fig = px.scatter(x=y_clean, y=predictions, labels={'x': 'Taux d\'Engagement Réel (%)', 'y': 'Taux d\'Engagement Prévu (%)'},
                              title=f'Prédiction du Taux d\'Engagement (R² = {r2:.2f})',
                              template='plotly_dark')
-            fig.add_traces(px.line(x=y, y=y).data)
+            fig.add_traces(px.line(x=y_clean, y=y_clean).data)
             fig.update_layout(showlegend=False)
             return fig, r2
 
@@ -276,9 +290,10 @@ def generate_performance_graphs(excel_data):
         # Ajout des graphiques démographiques
         # Nettoyer les données démographiques
         demographics_df['Pourcentage'] = demographics_df['Pourcentage'].astype(str)
-        demographics_df['Pourcentage'].replace('nan', np.nan, inplace=True)
         demographics_df['Pourcentage'] = demographics_df['Pourcentage'].str.rstrip('%')
         demographics_df['Pourcentage'] = pd.to_numeric(demographics_df['Pourcentage'], errors='coerce')
+        # Supprimer les lignes avec des valeurs manquantes
+        demographics_df = demographics_df.dropna(subset=['Principales données démographiques', 'Valeur', 'Pourcentage'])
         demographics_df['Pourcentage'] = demographics_df['Pourcentage'].fillna(0)
 
         demographics_categories = demographics_df['Principales données démographiques'].unique()
@@ -318,25 +333,4 @@ def generate_performance_graphs(excel_data):
             "explanation_growth_peaks": explanation_growth_peaks,
             "fig_corr_matrix": fig_corr_matrix,
             "explanation_corr_matrix": explanation_corr_matrix,
-            "fig_corr_inter_impr": fig_corr_inter_impr,
-            "explanation_corr_inter_impr": explanation_corr_inter_impr,
-            "fig_corr_posts_engagement": fig_corr_posts_engagement,
-            "explanation_corr_posts_engagement": explanation_corr_posts_engagement,
-            "fig_regression": fig_regression,
-            "explanation_regression": explanation_regression,
-            "demographics_figures": demographics_figures,
-            "kpi_mean_engagement_rate": mean_engagement_rate,
-            "kpi_mean_growth_rate": mean_growth_rate,
-            "kpi_total_interactions": total_interactions,
-            "recommendations": recommendations,
-            "combined_df": combined_df  # Pour le téléchargement
-        }
-
-    except Exception as e:
-        st.error(f"Une erreur est survenue lors de la génération des graphiques : {e}")
-        return None
-
-# Interface utilisateur
-st.sidebar.header("Paramètres")
-
-uploaded_file = st.sidebar.file_uploader("Sélectionne
+            "fig_corr_inter_im
