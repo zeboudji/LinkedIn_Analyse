@@ -35,22 +35,28 @@ def generate_performance_graphs(excel_data):
         meilleurs_posts_df.columns = ['Date de publication', 'Interactions']
         meilleurs_posts_df['Date de publication'] = pd.to_datetime(meilleurs_posts_df['Date de publication'], format='%d/%m/%Y', errors='coerce')
         meilleurs_posts_df['Interactions'] = pd.to_numeric(meilleurs_posts_df['Interactions'], errors='coerce')
+        # Gérer les valeurs manquantes en supprimant les lignes avec des dates manquantes
+        meilleurs_posts_df = meilleurs_posts_df.dropna(subset=['Date de publication'])
         posts_per_day = meilleurs_posts_df['Date de publication'].value_counts().sort_index()
 
         # Nettoyer le dataframe des abonnés et calculer les abonnés cumulés
-        abonnes_df_clean = abonnes_df.dropna()
+        # Gérer les valeurs manquantes en supprimant les lignes où 'Date' ou 'Nouveaux abonnés' est manquant
+        abonnes_df_clean = abonnes_df.dropna(subset=['Date', 'Nouveaux abonnés'])
         # Vérifier le nom exact de la colonne Date dans abonnes_df_clean
         date_column_abonnes = [col for col in abonnes_df_clean.columns if 'Date' in col][0]
         abonnes_df_clean.rename(columns={date_column_abonnes: 'Date'}, inplace=True)
         abonnes_df_clean['Date'] = pd.to_datetime(abonnes_df_clean['Date'], format='%d/%m/%Y', errors='coerce')
-        abonnes_df_clean['Nouveaux abonnés'] = pd.to_numeric(abonnes_df_clean['Nouveaux abonnés'], errors='coerce')
+        abonnes_df_clean['Nouveaux abonnés'] = pd.to_numeric(abonnes_df_clean['Nouveaux abonnés'], errors='coerce').fillna(0)
         abonnes_df_clean['Cumulative Subscribers'] = abonnes_df_clean['Nouveaux abonnés'].cumsum()
 
         # Calculer le taux d'engagement
-        engagement_df['Interactions'] = pd.to_numeric(engagement_df['Interactions'], errors='coerce')
-        engagement_df['Impressions'] = pd.to_numeric(engagement_df['Impressions'], errors='coerce')
+        engagement_df['Interactions'] = pd.to_numeric(engagement_df['Interactions'], errors='coerce').fillna(0)
+        engagement_df['Impressions'] = pd.to_numeric(engagement_df['Impressions'], errors='coerce').fillna(0)
         engagement_df['Date'] = pd.to_datetime(engagement_df['Date'], format='%d/%m/%Y', errors='coerce')
+        # Remplacer les impressions à zéro pour éviter la division par zéro
+        engagement_df['Impressions'] = engagement_df['Impressions'].replace(0, pd.NA)
         engagement_df['Engagement Rate (%)'] = (engagement_df['Interactions'] / engagement_df['Impressions']) * 100
+        engagement_df['Engagement Rate (%)'] = engagement_df['Engagement Rate (%)'].fillna(0)
 
         # Combiner les données pour le traçage
         combined_df = pd.merge(engagement_df, abonnes_df_clean, on='Date', how='left')
@@ -161,8 +167,8 @@ def generate_performance_graphs(excel_data):
         """
 
         # Graphique 8 : Matrice de Corrélation (Heatmap)
-        numeric_cols = ['Interactions', 'Impressions', 'Engagement Rate (%)', 'Cumulative Subscribers', 'Growth Rate']
-        corr_matrix = combined_df[numeric_cols].corr()
+        numeric_cols = ['Interactions', 'Impressions', 'Engagement Rate (%)', 'Cumulative Subscribers', 'Growth Rate', 'Posts per Day']
+        corr_matrix = combined_df[numeric_cols].corr().fillna(0)
 
         fig_corr_matrix = ff.create_annotated_heatmap(
             z=corr_matrix.values,
@@ -212,8 +218,9 @@ def generate_performance_graphs(excel_data):
 
         # Graphique 10 : Régression Linéaire pour Prédire le Taux d'Engagement
         def regression_engagement(combined_df):
-            X = combined_df[['Impressions', 'Posts per Day', 'Cumulative Subscribers']]
-            y = combined_df['Engagement Rate (%)']
+            # Remplacer les valeurs manquantes dans les variables explicatives
+            X = combined_df[['Impressions', 'Posts per Day', 'Cumulative Subscribers']].fillna(0)
+            y = combined_df['Engagement Rate (%)'].fillna(0)
 
             model = LinearRegression()
             model.fit(X, y)
@@ -257,6 +264,7 @@ def generate_performance_graphs(excel_data):
         demographics_df['Pourcentage'].replace('nan', pd.NA, inplace=True)
         demographics_df['Pourcentage'] = demographics_df['Pourcentage'].str.rstrip('%')
         demographics_df['Pourcentage'] = pd.to_numeric(demographics_df['Pourcentage'], errors='coerce')
+        demographics_df['Pourcentage'] = demographics_df['Pourcentage'].fillna(0)
 
         demographics_categories = demographics_df['Principales données démographiques'].unique()
 
@@ -341,53 +349,4 @@ if uploaded_file is not None:
             st.markdown(results["explanation_engagement"])
 
             st.plotly_chart(results["fig_subscribers"], use_container_width=True)
-            st.markdown(results["explanation_subscribers"])
-
-            st.plotly_chart(results["fig_corr_abonnes_engagement"], use_container_width=True)
-            st.markdown(results["explanation_corr_abonnes_engagement"])
-
-            st.plotly_chart(results["fig_growth_peaks"], use_container_width=True)
-            st.markdown(results["explanation_growth_peaks"])
-
-        with tab3:
-            st.header("Matrice de Corrélation")
-            st.plotly_chart(results["fig_corr_matrix"], use_container_width=True)
-            st.markdown(results["explanation_corr_matrix"])
-
-            st.header("Corrélations Supplémentaires")
-            st.plotly_chart(results["fig_corr_inter_impr"], use_container_width=True)
-            st.markdown(results["explanation_corr_inter_impr"])
-
-            st.plotly_chart(results["fig_corr_posts_engagement"], use_container_width=True)
-            st.markdown(results["explanation_corr_posts_engagement"])
-
-            st.header("Régression Linéaire pour le Taux d'Engagement")
-            st.plotly_chart(results["fig_regression"], use_container_width=True)
-            st.markdown(results["explanation_regression"])
-
-            st.header("Indicateurs Clés de Performance (KPI)")
-            kpi1, kpi2, kpi3 = st.columns(3)
-            kpi1.metric("Taux d'Engagement Moyen", f"{results['kpi_mean_engagement_rate']:.2f}%")
-            kpi2.metric("Croissance Moyenne des Abonnés", f"{results['kpi_mean_growth_rate']:.2f}%")
-            kpi3.metric("Total des Interactions", f"{results['kpi_total_interactions']}")
-
-            st.header("Recommandations Basées sur les Analyses")
-            st.markdown(results["recommendations"])
-
-            st.header("Données Démographiques")
-            for category, fig in results["demographics_figures"].items():
-                st.plotly_chart(fig, use_container_width=True)
-
-            # Option pour télécharger les données analysées
-            st.header("Télécharger les Données Analytiques")
-            csv = convert_df(results["combined_df"])
-            st.download_button(
-                label="Télécharger les Données Analytiques",
-                data=csv,
-                file_name='analyse_linkedin.csv',
-                mime='text/csv',
-            )
-    else:
-        st.error("Erreur dans la génération des graphiques. Veuillez vérifier vos données.")
-else:
-    st.info("Veuillez télécharger un fichier Excel pour commencer l'analyse.")
+    
