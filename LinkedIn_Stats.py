@@ -1,10 +1,14 @@
-import pandas as pd
+import pandas as pd 
 import streamlit as st
 import plotly.express as px
 import plotly.figure_factory as ff
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import r2_score
 from io import BytesIO
+from fpdf import FPDF
+import plotly.io as pio
+import base64
+import tempfile
 
 # Configuration de la page Streamlit
 st.set_page_config(page_title="Analyse des Performances LinkedIn", layout="wide")
@@ -12,6 +16,28 @@ st.set_page_config(page_title="Analyse des Performances LinkedIn", layout="wide"
 # Fonction pour convertir un DataFrame en CSV pour téléchargement
 def convert_df(df):
     return df.to_csv(index=False).encode('utf-8')
+
+# Fonction pour exporter une figure Plotly en image PNG
+def fig_to_png(fig):
+    return pio.to_image(fig, format='png')
+
+# Fonction pour créer un PDF à partir des images des figures
+def create_pdf(figures, titles):
+    pdf = FPDF()
+    for fig, title in zip(figures, titles):
+        img = fig_to_png(fig)
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_file:
+            tmp_file.write(img)
+            tmp_filename = tmp_file.name
+        pdf.add_page()
+        pdf.set_font("Arial", size=16)
+        pdf.cell(200, 10, txt=title, ln=True, align='C')
+        pdf.image(tmp_filename, x=10, y=20, w=190)
+    # Sauvegarder le PDF dans un buffer
+    pdf_buffer = BytesIO()
+    pdf.output(pdf_buffer)
+    pdf_buffer.seek(0)
+    return pdf_buffer
 
 # Fonction pour générer les graphiques de performance
 def generate_performance_graphs(excel_data):
@@ -200,11 +226,16 @@ def generate_performance_graphs(excel_data):
             # Trier les valeurs par pourcentage décroissant
             df_category = df_category.sort_values(by='Pourcentage', ascending=False)
 
-            # Créer un graphique en camembert pour chaque catégorie
+            # Créer un graphique en camembert pour chaque catégorie avec améliorations
             fig = px.pie(df_category, values='Pourcentage', names='Valeur',
                          title=f'Distribution de {category}',
                          template='plotly_dark',
-                         hole=0.3)
+                         hole=0.3,
+                         color_discrete_sequence=px.colors.sequential.Plasma)
+
+            # Ajouter des étiquettes de pourcentage
+            fig.update_traces(textinfo='percent+label', textposition='inside')
+
             demographics_figures[category] = fig
 
         # Préparer le dictionnaire de retour
@@ -313,46 +344,83 @@ if uploaded_file is not None:
             with col1:
                 st.plotly_chart(results["fig_subscribers"], use_container_width=True)
                 st.markdown(results["explanation_subscribers"])
+                # Bouton de téléchargement individuel
+                buf = fig_to_png(results["fig_subscribers"])
+                b64 = base64.b64encode(buf).decode()
+                href = f'<a href="data:application/octet-stream;base64,{b64}" download="abonnes_cumules.png">Télécharger ce graphique en PNG</a>'
+                st.markdown(href, unsafe_allow_html=True)
 
             with col2:
                 st.plotly_chart(results["fig_corr_abonnes_engagement"], use_container_width=True)
                 st.markdown(results["explanation_corr_abonnes_engagement"])
+                # Bouton de téléchargement individuel
+                buf = fig_to_png(results["fig_corr_abonnes_engagement"])
+                b64 = base64.b64encode(buf).decode()
+                href = f'<a href="data:application/octet-stream;base64,{b64}" download="corr_abonnes_engagement.png">Télécharger ce graphique en PNG</a>'
+                st.markdown(href, unsafe_allow_html=True)
 
             # Disposition en deux colonnes : Croissance des Abonnés et Régression Linéaire
             col3, col4 = st.columns(2)
             with col3:
                 st.plotly_chart(results["fig_growth_peaks"], use_container_width=True)
                 st.markdown(results["explanation_growth_peaks"])
+                # Bouton de téléchargement individuel
+                buf = fig_to_png(results["fig_growth_peaks"])
+                b64 = base64.b64encode(buf).decode()
+                href = f'<a href="data:application/octet-stream;base64,{b64}" download="growth_peaks.png">Télécharger ce graphique en PNG</a>'
+                st.markdown(href, unsafe_allow_html=True)
 
             with col4:
                 st.plotly_chart(results["fig_regression"], use_container_width=True)
                 st.markdown(results["explanation_regression"])
+                # Bouton de téléchargement individuel
+                buf = fig_to_png(results["fig_regression"])
+                b64 = base64.b64encode(buf).decode()
+                href = f'<a href="data:application/octet-stream;base64,{b64}" download="regression_engagement.png">Télécharger ce graphique en PNG</a>'
+                st.markdown(href, unsafe_allow_html=True)
 
         with tab_posts:
             st.header("Performance des Posts")
-
-            # Indicateur supplémentaire : Total des Impressions (déjà dans KPI dans "Engagement et Abonnés")
-            # Si vous souhaitez afficher une autre mesure spécifique ici, vous pouvez l'ajouter
 
             # Disposition en deux colonnes : Nombre de Posts (Histogramme) et Impressions
             col1, col2 = st.columns(2)
             with col1:
                 st.plotly_chart(results["fig_posts_bar"], use_container_width=True)
                 st.markdown(results["explanation_posts_bar"])
+                # Bouton de téléchargement individuel
+                buf = fig_to_png(results["fig_posts_bar"])
+                b64 = base64.b64encode(buf).decode()
+                href = f'<a href="data:application/octet-stream;base64,{b64}" download="posts_bar.png">Télécharger ce graphique en PNG</a>'
+                st.markdown(href, unsafe_allow_html=True)
 
             with col2:
                 st.plotly_chart(results["fig_impressions"], use_container_width=True)
                 st.markdown(results["explanation_impressions"])
+                # Bouton de téléchargement individuel
+                buf = fig_to_png(results["fig_impressions"])
+                b64 = base64.b64encode(buf).decode()
+                href = f'<a href="data:application/octet-stream;base64,{b64}" download="impressions.png">Télécharger ce graphique en PNG</a>'
+                st.markdown(href, unsafe_allow_html=True)
 
             # Disposition en deux colonnes : Interactions et Taux d'Engagement
             col3, col4 = st.columns(2)
             with col3:
                 st.plotly_chart(results["fig_interactions"], use_container_width=True)
                 st.markdown(results["explanation_interactions"])
+                # Bouton de téléchargement individuel
+                buf = fig_to_png(results["fig_interactions"])
+                b64 = base64.b64encode(buf).decode()
+                href = f'<a href="data:application/octet-stream;base64,{b64}" download="interactions.png">Télécharger ce graphique en PNG</a>'
+                st.markdown(href, unsafe_allow_html=True)
 
             with col4:
                 st.plotly_chart(results["fig_engagement"], use_container_width=True)
                 st.markdown(results["explanation_engagement"])
+                # Bouton de téléchargement individuel
+                buf = fig_to_png(results["fig_engagement"])
+                b64 = base64.b64encode(buf).decode()
+                href = f'<a href="data:application/octet-stream;base64,{b64}" download="engagement.png">Télécharger ce graphique en PNG</a>'
+                st.markdown(href, unsafe_allow_html=True)
 
         with tab_advanced:
             st.header("Analyses Avancées")
@@ -361,16 +429,31 @@ if uploaded_file is not None:
             st.subheader("Matrice de Corrélation")
             st.plotly_chart(results["fig_corr_matrix"], use_container_width=True)
             st.markdown(results["explanation_corr_matrix"])
+            # Bouton de téléchargement individuel
+            buf = fig_to_png(results["fig_corr_matrix"])
+            b64 = base64.b64encode(buf).decode()
+            href = f'<a href="data:application/octet-stream;base64,{b64}" download="corr_matrix.png">Télécharger ce graphique en PNG</a>'
+            st.markdown(href, unsafe_allow_html=True)
 
             # Disposition en deux colonnes pour les corrélations supplémentaires
             col1, col2 = st.columns(2)
             with col1:
                 st.plotly_chart(results["fig_corr_inter_impr"], use_container_width=True)
                 st.markdown(results["explanation_corr_inter_impr"])
+                # Bouton de téléchargement individuel
+                buf = fig_to_png(results["fig_corr_inter_impr"])
+                b64 = base64.b64encode(buf).decode()
+                href = f'<a href="data:application/octet-stream;base64,{b64}" download="corr_inter_impr.png">Télécharger ce graphique en PNG</a>'
+                st.markdown(href, unsafe_allow_html=True)
 
             with col2:
                 st.plotly_chart(results["fig_corr_posts_engagement"], use_container_width=True)
                 st.markdown(results["explanation_corr_posts_engagement"])
+                # Bouton de téléchargement individuel
+                buf = fig_to_png(results["fig_corr_posts_engagement"])
+                b64 = base64.b64encode(buf).decode()
+                href = f'<a href="data:application/octet-stream;base64,{b64}" download="corr_posts_engagement.png">Télécharger ce graphique en PNG</a>'
+                st.markdown(href, unsafe_allow_html=True)
 
             # Section : Données Démographiques
             st.header("Données Démographiques")
@@ -386,6 +469,11 @@ if uploaded_file is not None:
                         fig = demographics_figures[category]
                         with cols[j]:
                             st.plotly_chart(fig, use_container_width=True)
+                            # Bouton de téléchargement individuel
+                            buf = fig_to_png(fig)
+                            b64 = base64.b64encode(buf).decode()
+                            href = f'<a href="data:application/octet-stream;base64,{b64}" download="distribution_{category}.png">Télécharger ce graphique en PNG</a>'
+                            st.markdown(href, unsafe_allow_html=True)
 
             # Section : Téléchargement des Données
             st.header("Télécharger les Données Analytiques")
@@ -396,6 +484,53 @@ if uploaded_file is not None:
                 file_name='analyse_linkedin.csv',
                 mime='text/csv',
             )
+
+            # Bouton pour télécharger tous les graphiques en PDF
+            st.header("Télécharger Tous les Graphiques en PDF")
+            if st.button("Exporter tout en PDF"):
+                # Collecter toutes les figures et leurs titres
+                figures = [
+                    results["fig_engagement"],
+                    results["fig_impressions"],
+                    results["fig_interactions"],
+                    results["fig_subscribers"],
+                    results["fig_posts_bar"],
+                    results["fig_corr_abonnes_engagement"],
+                    results["fig_growth_peaks"],
+                    results["fig_corr_matrix"],
+                    results["fig_corr_inter_impr"],
+                    results["fig_corr_posts_engagement"],
+                    results["fig_regression"]
+                ]
+                # Ajouter les graphiques démographiques
+                for category in categories:
+                    figures.append(demographics_figures[category])
+
+                titles = [
+                    "Taux d'Engagement au Fil du Temps",
+                    "Impressions au Fil du Temps",
+                    "Interactions au Fil du Temps",
+                    "Abonnés Cumulés au Fil du Temps",
+                    "Nombre de Posts par Jour",
+                    "Corrélation Abonnés-Engagement",
+                    "Analyse des Pics de Croissance des Abonnés",
+                    "Matrice de Corrélation",
+                    "Corrélation Impressions-Interactions",
+                    "Corrélation Posts-Engagement",
+                    "Régression Linéaire Engagement",
+                ]
+                # Ajouter les titres des graphiques démographiques
+                for category in categories:
+                    titles.append(f"Distribution de {category}")
+
+                # Créer le PDF
+                pdf_buffer = create_pdf(figures, titles)
+
+                # Encoder le PDF en base64 pour le téléchargement
+                b64 = base64.b64encode(pdf_buffer.read()).decode()
+                href = f'<a href="data:application/octet-stream;base64,{b64}" download="tous_les_graphiques.pdf">Télécharger le PDF</a>'
+                st.markdown(href, unsafe_allow_html=True)
+
     else:
         st.error("Erreur dans la génération des graphiques. Veuillez vérifier vos données.")
 else:
