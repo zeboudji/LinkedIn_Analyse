@@ -7,8 +7,6 @@ from sklearn.linear_model import LinearRegression
 from sklearn.metrics import r2_score
 from io import BytesIO
 import plotly.io as pio
-import base64
-import tempfile
 
 # Configuration de la page Streamlit
 st.set_page_config(page_title="Analyse des Performances LinkedIn", layout="wide")
@@ -78,52 +76,76 @@ def generate_performance_graphs(excel_data):
         # Mettre à jour le titre de l'application avec la période d'analyse
         st.title(f"Analyse des Performances Réseaux Sociaux - LinkedIn ({start_date} - {end_date})")
 
+        # Définir une palette de couleurs cohérente
+        color_palette = {
+            'Posts per Day': 'indianred',
+            'Impressions': 'steelblue',
+            'Interactions': 'seagreen',
+            'Engagement Rate (%)': 'orange',
+            'Cumulative Subscribers': 'gold',
+            'Growth Rate': 'purple'
+        }
+
         # Graphiques principaux (ordre d'importance)
         # 1. Taux d'Engagement
         fig_engagement = px.line(combined_df, x='Date', y='Engagement Rate (%)',
                                  title='Taux d\'Engagement au Fil du Temps',
                                  labels={'Engagement Rate (%)': 'Taux d\'Engagement (%)'},
                                  markers=True,
-                                 template='plotly_dark')
+                                 template='plotly_dark',
+                                 line_shape='linear',
+                                 color_discrete_sequence=[color_palette['Engagement Rate (%)']])
 
         # 2. Impressions au Fil du Temps
         fig_impressions = px.line(combined_df, x='Date', y='Impressions',
                                   title='Impressions au Fil du Temps',
                                   labels={'Impressions': 'Impressions'},
                                   markers=True,
-                                  template='plotly_dark')
+                                  template='plotly_dark',
+                                  line_shape='linear',
+                                  color_discrete_sequence=[color_palette['Impressions']])
 
         # 3. Interactions au Fil du Temps
         fig_interactions = px.line(combined_df, x='Date', y='Interactions',
                                    title='Interactions au Fil du Temps',
                                    labels={'Interactions': 'Interactions'},
                                    markers=True,
-                                   template='plotly_dark')
+                                   template='plotly_dark',
+                                   line_shape='linear',
+                                   color_discrete_sequence=[color_palette['Interactions']])
 
         # 4. Abonnés Cumulés au Fil du Temps
         fig_subscribers = px.line(combined_df, x='Date', y='Cumulative Subscribers',
                                   title='Abonnés Cumulés au Fil du Temps',
                                   labels={'Cumulative Subscribers': 'Abonnés Cumulés'},
                                   markers=True,
-                                  template='plotly_dark')
+                                  template='plotly_dark',
+                                  line_shape='linear',
+                                  color_discrete_sequence=[color_palette['Cumulative Subscribers']])
 
         # 5. Nombre de Posts par Jour (Histogramme)
         fig_posts_bar = px.bar(combined_df, x='Date', y='Posts per Day',
                                title='Nombre de Posts par Jour',
                                labels={'Posts per Day': 'Nombre de posts', 'Date': 'Date'},
-                               template='plotly_dark')
+                               template='plotly_dark',
+                               color_discrete_sequence=[color_palette['Posts per Day']])
 
         # 6. Corrélation entre Abonnés Cumulés et Taux d'Engagement
         fig_corr_abonnes_engagement = px.scatter(combined_df, x='Cumulative Subscribers', y='Engagement Rate (%)',
                                                  title="Corrélation entre Abonnés Cumulés et Taux d'Engagement",
                                                  labels={'Cumulative Subscribers': 'Abonnés Cumulés', 'Engagement Rate (%)': 'Taux d\'Engagement (%)'},
-                                                 trendline="ols", template='plotly_dark')
+                                                 trendline="ols",
+                                                 template='plotly_dark',
+                                                 color_discrete_sequence=[color_palette['Cumulative Subscribers']])
 
         # 7. Analyse des Pics de Croissance des Abonnés
         fig_growth_peaks = px.line(abonnes_df_clean, x='Date', y='Growth Rate',
                                    title="Analyse des Pics de Croissance des Abonnés",
                                    labels={'Date': 'Date', 'Growth Rate': 'Taux de Croissance (%)'},
-                                   markers=True, template='plotly_dark')
+                                   markers=True, 
+                                   template='plotly_dark',
+                                   line_shape='linear',
+                                   color_discrete_sequence=[color_palette['Growth Rate']])
 
         # 8. Matrice de Corrélation (Affichage en grand)
         numeric_cols = ['Interactions', 'Impressions', 'Engagement Rate (%)', 'Cumulative Subscribers', 'Growth Rate']
@@ -147,13 +169,17 @@ def generate_performance_graphs(excel_data):
         fig_corr_inter_impr = px.scatter(combined_df, x='Impressions', y='Interactions',
                                          title="Corrélation entre Impressions et Interactions",
                                          labels={'Impressions': 'Impressions', 'Interactions': 'Interactions'},
-                                         trendline="ols", template='plotly_dark')
+                                         trendline="ols",
+                                         template='plotly_dark',
+                                         color_discrete_sequence=[color_palette['Impressions']])
 
         # 9b. Corrélation entre Posts par Jour et Taux d'Engagement
         fig_corr_posts_engagement = px.scatter(combined_df, x='Posts per Day', y='Engagement Rate (%)',
                                                title="Corrélation entre Nombre de Posts et Taux d'Engagement",
                                                labels={'Posts per Day': 'Nombre de Posts par Jour', 'Engagement Rate (%)': 'Taux d\'Engagement (%)'},
-                                               trendline="ols", template='plotly_dark')
+                                               trendline="ols",
+                                               template='plotly_dark',
+                                               color_discrete_sequence=[color_palette['Posts per Day']])
 
         # 10. Régression Linéaire pour Prédire le Taux d'Engagement
         def regression_engagement(combined_df):
@@ -168,7 +194,8 @@ def generate_performance_graphs(excel_data):
 
             fig = px.scatter(x=y, y=predictions, labels={'x': 'Taux d\'Engagement Réel (%)', 'y': 'Taux d\'Engagement Prévu (%)'},
                              title=f'Prédiction du Taux d\'Engagement (R² = {r2:.2f})',
-                             template='plotly_dark')
+                             template='plotly_dark',
+                             color_discrete_sequence=[color_palette['Engagement Rate (%)']])
             fig.add_traces(px.line(x=y, y=y).data)
             fig.update_layout(showlegend=False)
             return fig, r2
@@ -240,7 +267,7 @@ def generate_performance_graphs(excel_data):
             x=combined_df['Date'],
             y=combined_df['Posts per Day'],
             name='Nombre de Posts',
-            marker_color='indianred'
+            marker_color=color_palette['Posts per Day']
         ))
 
         # Ajouter les Impressions par Jour en tant que Ligne avec Axe Y secondaire
@@ -249,7 +276,7 @@ def generate_performance_graphs(excel_data):
             y=combined_df['Impressions'],
             name='Impressions',
             mode='lines+markers',
-            marker=dict(color='blue'),
+            marker=dict(color=color_palette['Impressions']),
             yaxis='y2'
         ))
 
@@ -259,7 +286,7 @@ def generate_performance_graphs(excel_data):
             y=combined_df['Interactions'],
             name='Interactions',
             mode='lines+markers',
-            marker=dict(color='green'),
+            marker=dict(color=color_palette['Interactions']),
             yaxis='y2'
         ))
 
@@ -269,13 +296,13 @@ def generate_performance_graphs(excel_data):
             xaxis=dict(title='Date'),
             yaxis=dict(
                 title='Nombre de Posts',
-                titlefont=dict(color='indianred'),
-                tickfont=dict(color='indianred')
+                titlefont=dict(color=color_palette['Posts per Day']),
+                tickfont=dict(color=color_palette['Posts per Day'])
             ),
             yaxis2=dict(
                 title='Impressions / Interactions',
-                titlefont=dict(color='blue'),
-                tickfont=dict(color='blue'),
+                titlefont=dict(color=color_palette['Impressions']),
+                tickfont=dict(color=color_palette['Impressions']),
                 overlaying='y',
                 side='right'
             ),
@@ -288,6 +315,45 @@ def generate_performance_graphs(excel_data):
             ),
             template='plotly_dark',
             barmode='group',
+            height=600
+        )
+
+        # Création du Nouveau Graphique Combiné : Impressions et Interactions par Jour
+        fig_impr_inter = go.Figure()
+
+        # Ajouter les Impressions par Jour en tant que Ligne
+        fig_impr_inter.add_trace(go.Scatter(
+            x=combined_df['Date'],
+            y=combined_df['Impressions'],
+            name='Impressions',
+            mode='lines+markers',
+            marker=dict(color=color_palette['Impressions']),
+            line=dict(width=2)
+        ))
+
+        # Ajouter les Interactions par Jour en tant que Ligne
+        fig_impr_inter.add_trace(go.Scatter(
+            x=combined_df['Date'],
+            y=combined_df['Interactions'],
+            name='Interactions',
+            mode='lines+markers',
+            marker=dict(color=color_palette['Interactions']),
+            line=dict(width=2)
+        ))
+
+        # Mise en page du nouveau graphique combiné
+        fig_impr_inter.update_layout(
+            title='Impressions et Interactions par Jour',
+            xaxis=dict(title='Date'),
+            yaxis=dict(title='Nombre'),
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=1.02,
+                xanchor="center",
+                x=0.5
+            ),
+            template='plotly_dark',
             height=600
         )
 
@@ -356,6 +422,11 @@ def generate_performance_graphs(excel_data):
             "explanation_combined": """
             **Interprétation :** Ce graphique combiné affiche le nombre de posts par jour sous forme de barres, ainsi que les impressions et les interactions par jour sous forme de lignes. 
             Cela permet de visualiser simultanément la fréquence des publications et leur impact en termes de portée et d'engagement.
+            """,
+            "fig_impr_inter": fig_impr_inter,
+            "explanation_impr_inter": """
+            **Interprétation :** Ce graphique combiné affiche les impressions et les interactions par jour sous forme de lignes. 
+            Cela permet de comparer directement la portée de vos posts avec le niveau d'engagement généré.
             """,
             "demographics_figures": demographics_figures,
             "kpi_mean_engagement_rate": mean_engagement_rate,
@@ -460,6 +531,17 @@ if uploaded_file is not None:
                 label="Télécharger ce graphique en PNG",
                 data=fig_to_png(results["fig_combined"]),
                 file_name="combined_posts_impressions_interactions.png",
+                mime="image/png",
+            )
+
+            # Nouveau Graphique Combiné : Impressions et Interactions par Jour
+            st.subheader("Impressions et Interactions par Jour")
+            st.plotly_chart(results["fig_impr_inter"], use_container_width=True)
+            st.markdown(results["explanation_impr_inter"])
+            st.download_button(
+                label="Télécharger ce graphique en PNG",
+                data=fig_to_png(results["fig_impr_inter"]),
+                file_name="impressions_interactions.png",
                 mime="image/png",
             )
 
