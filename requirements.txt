@@ -5,4 +5,4 @@ openpyxl
 statsmodels
 scikit-learn
 kaleido
-fpdf2
+fpdf2 requests
