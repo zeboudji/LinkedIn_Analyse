@@ -99,15 +99,27 @@ def generate_performance_graphs(excel_data):
                                   markers=True,
                                   template='plotly_dark')
 
-        # 5. Nombre de Posts par Jour (Conversion en Camembert)
-        # Pour rendre un camembert approprié, nous allons agrégger les posts par jour de la semaine
-        combined_df['Day of Week'] = combined_df['Date'].dt.day_name()
+        # 5. Nombre de Posts par Jour (Conversion en Camembert avec chiffres entiers et en français)
+        # Mapper les noms des jours en français
+        day_mapping = {
+            'Monday': 'Lundi',
+            'Tuesday': 'Mardi',
+            'Wednesday': 'Mercredi',
+            'Thursday': 'Jeudi',
+            'Friday': 'Vendredi',
+            'Saturday': 'Samedi',
+            'Sunday': 'Dimanche'
+        }
+        combined_df['Day of Week'] = combined_df['Date'].dt.day_name().map(day_mapping)
         posts_per_day_of_week = combined_df.groupby('Day of Week')['Posts per Day'].sum().reindex([
-            'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'
+            'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'
         ]).fillna(0)
+
         fig_posts_pie = px.pie(values=posts_per_day_of_week.values, names=posts_per_day_of_week.index,
                               title='Répartition des Posts par Jour de la Semaine',
-                              template='plotly_dark')
+                              template='plotly_dark',
+                              labels={'labels': 'Jour de la Semaine', 'values': 'Nombre de Posts'},
+                              hole=0.3)
 
         # 6. Corrélation entre Abonnés Cumulés et Taux d'Engagement
         fig_corr_abonnes_engagement = px.scatter(combined_df, x='Cumulative Subscribers', y='Engagement Rate (%)',
@@ -121,7 +133,7 @@ def generate_performance_graphs(excel_data):
                                    labels={'Date': 'Date', 'Growth Rate': 'Taux de Croissance (%)'},
                                    markers=True, template='plotly_dark')
 
-        # 8. Matrice de Corrélation
+        # 8. Matrice de Corrélation (Affichage en grand)
         numeric_cols = ['Interactions', 'Impressions', 'Engagement Rate (%)', 'Cumulative Subscribers', 'Growth Rate']
         corr_matrix = combined_df[numeric_cols].corr()
 
@@ -137,7 +149,7 @@ def generate_performance_graphs(excel_data):
         )
         fig_corr_matrix.update_layout(title='Matrice de Corrélation',
                                       template='plotly_dark',
-                                      width=700, height=700)
+                                      width=900, height=900)
 
         # 9a. Corrélation entre Impressions et Interactions
         fig_corr_inter_impr = px.scatter(combined_df, x='Impressions', y='Interactions',
@@ -206,7 +218,8 @@ def generate_performance_graphs(excel_data):
             # Créer un graphique en camembert pour chaque catégorie
             fig = px.pie(df_category, values='Pourcentage', names='Valeur',
                          title=f'Distribution de {category}',
-                         template='plotly_dark')
+                         template='plotly_dark',
+                         hole=0.3)
             demographics_figures[category] = fig
 
         # Préparer le dictionnaire de retour
@@ -291,34 +304,21 @@ if uploaded_file is not None:
     results = generate_performance_graphs(uploaded_file)
 
     if results:
-        # Organisation des graphiques dans des onglets
-        tab1, tab2, tab3 = st.tabs(["Performance des Posts", "Engagement et Abonnés", "Analyses Avancées"])
-
-        with tab1:
-            st.header("Performance des Posts")
-
-            # Disposition en deux colonnes : Nombre de Posts et Camembert des Posts par Jour de la Semaine
-            col1, col2 = st.columns(2)
-            with col1:
-                st.plotly_chart(results["fig_posts_pie"], use_container_width=True)
-                st.markdown(results["explanation_posts_pie"])
-
-            with col2:
-                st.plotly_chart(results["fig_impressions"], use_container_width=True)
-                st.markdown(results["explanation_impressions"])
-
-            # Disposition en deux colonnes : Interactions et Taux d'Engagement
-            col3, col4 = st.columns(2)
-            with col3:
-                st.plotly_chart(results["fig_interactions"], use_container_width=True)
-                st.markdown(results["explanation_interactions"])
-
-            with col4:
-                st.plotly_chart(results["fig_engagement"], use_container_width=True)
-                st.markdown(results["explanation_engagement"])
+        # Organisation des graphiques dans des onglets avec "Engagement et Abonnés" en premier
+        tab2, tab1, tab3 = st.tabs(["Engagement et Abonnés", "Performance des Posts", "Analyses Avancées"])
 
         with tab2:
             st.header("Engagement et Abonnés")
+
+            # Indicateurs Clés de Performance (KPI)
+            st.subheader("Indicateurs Clés de Performance (KPI)")
+            kpi1, kpi2, kpi3 = st.columns(3)
+            kpi1.metric("Taux d'Engagement Moyen", f"{results['kpi_mean_engagement_rate']:.2f}%")
+            kpi2.metric("Croissance Moyenne des Abonnés", f"{results['kpi_mean_growth_rate']:.2f}%")
+            kpi3.metric("Total des Interactions", f"{results['kpi_total_interactions']}")
+
+            st.subheader("Recommandations Basées sur les Analyses")
+            st.markdown(results["recommendations"])
 
             # Disposition en deux colonnes : Abonnés Cumulés et Corrélation Abonnés-Engagement
             col1, col2 = st.columns(2)
@@ -340,38 +340,53 @@ if uploaded_file is not None:
                 st.plotly_chart(results["fig_regression"], use_container_width=True)
                 st.markdown(results["explanation_regression"])
 
+        with tab1:
+            st.header("Performance des Posts")
+
+            # Disposition en deux colonnes : Nombre de Posts (Camembert) et Impressions
+            col1, col2 = st.columns(2)
+            with col1:
+                st.plotly_chart(results["fig_posts_pie"], use_container_width=True)
+                st.markdown(results["explanation_posts_pie"])
+
+            with col2:
+                st.plotly_chart(results["fig_impressions"], use_container_width=True)
+                st.markdown(results["explanation_impressions"])
+
+            # Disposition en deux colonnes : Interactions et Taux d'Engagement
+            col3, col4 = st.columns(2)
+            with col3:
+                st.plotly_chart(results["fig_interactions"], use_container_width=True)
+                st.markdown(results["explanation_interactions"])
+
+            with col4:
+                st.plotly_chart(results["fig_engagement"], use_container_width=True)
+                st.markdown(results["explanation_engagement"])
+
         with tab3:
             st.header("Analyses Avancées")
 
-            # Disposition en deux colonnes : Matrice de Corrélation et Corrélations Supplémentaires
+            # Affichage de la Matrice de Corrélation en grand
+            st.subheader("Matrice de Corrélation")
+            st.plotly_chart(results["fig_corr_matrix"], use_container_width=True)
+            st.markdown(results["explanation_corr_matrix"])
+
+            # Disposition en deux colonnes pour les corrélations supplémentaires
             col1, col2 = st.columns(2)
             with col1:
-                st.plotly_chart(results["fig_corr_matrix"], use_container_width=True)
-                st.markdown(results["explanation_corr_matrix"])
-
-            with col2:
                 st.plotly_chart(results["fig_corr_inter_impr"], use_container_width=True)
                 st.markdown(results["explanation_corr_inter_impr"])
 
-            # Disposition en une seule colonne : Corrélation Posts-Engagement
-            st.plotly_chart(results["fig_corr_posts_engagement"], use_container_width=True)
-            st.markdown(results["explanation_corr_posts_engagement"])
+            with col2:
+                st.plotly_chart(results["fig_corr_posts_engagement"], use_container_width=True)
+                st.markdown(results["explanation_corr_posts_engagement"])
 
             # Section : Données Démographiques
             st.header("Données Démographiques")
             for category, fig in results["demographics_figures"].items():
                 st.plotly_chart(fig, use_container_width=True)
 
-            # Section : Indicateurs Clés de Performance (KPI) et Recommandations
-            st.header("Indicateurs Clés de Performance (KPI) et Recommandations")
-            kpi1, kpi2, kpi3 = st.columns(3)
-            kpi1.metric("Taux d'Engagement Moyen", f"{results['kpi_mean_engagement_rate']:.2f}%")
-            kpi2.metric("Croissance Moyenne des Abonnés", f"{results['kpi_mean_growth_rate']:.2f}%")
-            kpi3.metric("Total des Interactions", f"{results['kpi_total_interactions']}")
-
-            st.markdown(results["recommendations"])
-
-            # Option pour télécharger les données analysées
+            # Section : Téléchargement des Données
             st.header("Télécharger les Données Analytiques")
             csv = convert_df(results["combined_df"])
             st.download_button(
