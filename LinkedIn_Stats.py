@@ -13,6 +13,12 @@ st.set_page_config(page_title="Analyse des Performances LinkedIn", layout="wide"
 def convert_df(df):
     return df.to_csv(index=False).encode('utf-8')
 
+# Fonction pour rendre les URL cliquables dans le tableau
+def make_clickable(url):
+    if pd.isna(url):
+        return ""
+    return f'<a href="{url}" target="_blank">Voir le Post</a>'
+
 # Fonction pour générer les graphiques de performance
 def generate_performance_graphs(excel_data):
     try:
@@ -22,7 +28,7 @@ def generate_performance_graphs(excel_data):
         # Charger chaque feuille pertinente dans des dataframes
         engagement_df = pd.read_excel(xls, 'ENGAGEMENT')
         abonnes_df = pd.read_excel(xls, 'ABONNÉS', skiprows=2)
-        meilleurs_posts_df = pd.read_excel(xls, 'MEILLEURS POSTS').iloc[2:, 1:3]
+        meilleurs_posts_df = pd.read_excel(xls, 'MEILLEURS POSTS')
         demographics_df = pd.read_excel(xls, 'DONNÉES DÉMOGRAPHIQUES')
 
         # Nettoyer les noms de colonnes pour enlever les espaces
@@ -31,32 +37,68 @@ def generate_performance_graphs(excel_data):
         meilleurs_posts_df.columns = meilleurs_posts_df.columns.str.strip()
         demographics_df.columns = demographics_df.columns.str.strip()
 
+        # Afficher les noms des colonnes pour vérification
+        print("Colonnes dans 'MEILLEURS POSTS' :", meilleurs_posts_df.columns.tolist())
+
+        # Séparer les données des posts en deux DataFrames
+        # Colonnes A–C
+        if {'URL du post', 'Date de publication du post', 'Interactions'}.issubset(meilleurs_posts_df.columns):
+            meilleurs_posts_interactions = meilleurs_posts_df[['URL du post', 'Date de publication du post', 'Interactions']].dropna(subset=['URL du post'])
+        else:
+            st.error("Les colonnes A–C sont manquantes ou mal nommées dans la feuille 'MEILLEURS POSTS'.")
+            return None
+
+        # Colonnes E–G
+        if {'URL du post.1', 'Date de publication du post.1', 'Impressions'}.issubset(meilleurs_posts_df.columns):
+            meilleurs_posts_impressions = meilleurs_posts_df[['URL du post.1', 'Date de publication du post.1', 'Impressions']].dropna(subset=['URL du post.1'])
+        else:
+            st.error("Les colonnes E–G sont manquantes ou mal nommées dans la feuille 'MEILLEURS POSTS'.")
+            return None
+
+        # Renommer les colonnes pour éviter les doublons lors de la fusion
+        meilleurs_posts_interactions.rename(columns={
+            'URL du post': 'URL',
+            'Date de publication du post': 'Date'
+        }, inplace=True)
+
+        meilleurs_posts_impressions.rename(columns={
+            'URL du post.1': 'URL',
+            'Date de publication du post.1': 'Date'
+        }, inplace=True)
+
+        # Fusionner les deux DataFrames sur URL et Date
+        meilleurs_posts_combined = pd.merge(meilleurs_posts_interactions, meilleurs_posts_impressions, on=['URL', 'Date'], how='outer')
+
         # Nettoyer les données des posts
-        meilleurs_posts_df.columns = ['Date de publication', 'Interactions']
-        meilleurs_posts_df['Date de publication'] = pd.to_datetime(meilleurs_posts_df['Date de publication'], format='%d/%m/%Y', errors='coerce')
-        meilleurs_posts_df['Interactions'] = pd.to_numeric(meilleurs_posts_df['Interactions'], errors='coerce')
-        posts_per_day = meilleurs_posts_df['Date de publication'].value_counts().sort_index()
+        meilleurs_posts_combined['Date'] = pd.to_datetime(meilleurs_posts_combined['Date'], format='%d/%m/%Y', errors='coerce')
+        meilleurs_posts_combined['Interactions'] = pd.to_numeric(meilleurs_posts_combined['Interactions'], errors='coerce').fillna(0).astype(int)
+        meilleurs_posts_combined['Impressions'] = pd.to_numeric(meilleurs_posts_combined['Impressions'], errors='coerce').fillna(0).astype(int)
+
+        # Calculer le nombre de posts par jour
+        posts_per_day = meilleurs_posts_combined.groupby('Date')['URL'].count().reset_index().rename(columns={'URL': 'Posts per Day'})
 
         # Nettoyer le dataframe des abonnés et calculer les abonnés cumulés
-        abonnes_df_clean = abonnes_df.dropna()
-        date_column_abonnes = [col for col in abonnes_df_clean.columns if 'Date' in col][0]
+        abonnes_df_clean = abonnes_df.dropna(subset=['Date', 'Nouveaux abonnés'])
+        date_column_abonnes = 'Date'  # Nom de la colonne date après nettoyage
         abonnes_df_clean.rename(columns={date_column_abonnes: 'Date'}, inplace=True)
         abonnes_df_clean['Date'] = pd.to_datetime(abonnes_df_clean['Date'], format='%d/%m/%Y', errors='coerce')
-        abonnes_df_clean['Nouveaux abonnés'] = pd.to_numeric(abonnes_df_clean['Nouveaux abonnés'], errors='coerce')
+        abonnes_df_clean['Nouveaux abonnés'] = pd.to_numeric(abonnes_df_clean['Nouveaux abonnés'], errors='coerce').fillna(0).astype(int)
         abonnes_df_clean['Cumulative Subscribers'] = abonnes_df_clean['Nouveaux abonnés'].cumsum()
 
         # Calculer le taux d'engagement
-        engagement_df['Interactions'] = pd.to_numeric(engagement_df['Interactions'], errors='coerce')
-        engagement_df['Impressions'] = pd.to_numeric(engagement_df['Impressions'], errors='coerce')
+        engagement_df['Interactions'] = pd.to_numeric(engagement_df['Interactions'], errors='coerce').fillna(0).astype(int)
+        engagement_df['Impressions'] = pd.to_numeric(engagement_df['Impressions'], errors='coerce').fillna(0).astype(int)
         engagement_df['Date'] = pd.to_datetime(engagement_df['Date'], format='%d/%m/%Y', errors='coerce')
         engagement_df['Engagement Rate (%)'] = (engagement_df['Interactions'] / engagement_df['Impressions']) * 100
+        engagement_df['Engagement Rate (%)'] = engagement_df['Engagement Rate (%)'].replace([pd.NA, pd.NaT, float('inf'), -float('inf')], 0)
 
         # Combiner les données pour le traçage
-        combined_df = pd.merge(engagement_df, abonnes_df_clean, on='Date', how='left')
-        combined_df['Posts per Day'] = combined_df['Date'].map(posts_per_day).fillna(0)
+        combined_df = pd.merge(engagement_df, abonnes_df_clean[['Date', 'Cumulative Subscribers']], on='Date', how='left')
+        combined_df['Cumulative Subscribers'] = combined_df['Cumulative Subscribers'].fillna(method='ffill').fillna(0).astype(int)
 
-        # Conversion des dates pour Plotly
-        combined_df['Date'] = pd.to_datetime(combined_df['Date'])
+        # Ajouter le nombre de posts par jour
+        combined_df = pd.merge(combined_df, posts_per_day, on='Date', how='left')
+        combined_df['Posts per Day'] = combined_df['Posts per Day'].fillna(0).astype(int)
 
         # Calculer le taux de croissance des abonnés
         abonnes_df_clean['Growth Rate'] = abonnes_df_clean['Nouveaux abonnés'].pct_change().fillna(0) * 100  # En pourcentage
@@ -112,7 +154,7 @@ def generate_performance_graphs(excel_data):
                                                  trendline="ols", template='plotly_dark')
 
         # 7. Analyse des Pics de Croissance des Abonnés
-        fig_growth_peaks = px.line(abonnes_df_clean, x='Date', y='Growth Rate',
+        fig_growth_peaks = px.line(combined_df, x='Date', y='Growth Rate',
                                    title="Analyse des Pics de Croissance des Abonnés",
                                    labels={'Date': 'Date', 'Growth Rate': 'Taux de Croissance (%)'},
                                    markers=True, template='plotly_dark')
@@ -182,13 +224,18 @@ def generate_performance_graphs(excel_data):
         - **Analysez les contenus performants** pour identifier les thèmes qui résonnent le plus avec votre audience.
         """
 
-        # Ajout des graphiques démographiques (Conversion en Camemberts)
+        # Ajout des graphiques démographiques (Camemberts)
+        # Supposer que 'Principales données démographiques' contient des catégories comme 'Secteur'
+        # Améliorer l'affichage du camembert "Distribution de secteurs"
+
         # Nettoyer les données démographiques
         demographics_df['Pourcentage'] = demographics_df['Pourcentage'].astype(str)
         demographics_df['Pourcentage'].replace('nan', pd.NA, inplace=True)
         demographics_df['Pourcentage'] = demographics_df['Pourcentage'].str.rstrip('%')
         demographics_df['Pourcentage'] = pd.to_numeric(demographics_df['Pourcentage'], errors='coerce')
 
+        # Identifier les catégories spécifiques, par exemple 'Secteur'
+        # Supposons que 'Principales données démographiques' inclut 'Secteur'
         demographics_categories = demographics_df['Principales données démographiques'].unique()
 
         # Créer un dictionnaire pour stocker les figures démographiques
@@ -200,11 +247,17 @@ def generate_performance_graphs(excel_data):
             # Trier les valeurs par pourcentage décroissant
             df_category = df_category.sort_values(by='Pourcentage', ascending=False)
 
-            # Créer un graphique en camembert pour chaque catégorie
+            # Créer un graphique en camembert amélioré pour chaque catégorie
             fig = px.pie(df_category, values='Pourcentage', names='Valeur',
                          title=f'Distribution de {category}',
                          template='plotly_dark',
-                         hole=0.3)
+                         hole=0.3,
+                         labels={'Valeur': category, 'Pourcentage': 'Pourcentage (%)'})
+
+            # Améliorations visuelles
+            fig.update_traces(textposition='inside', textinfo='percent+label')
+            fig.update_layout(uniformtext_minsize=12, uniformtext_mode='hide')
+
             demographics_figures[category] = fig
 
         # Préparer le dictionnaire de retour
@@ -274,12 +327,18 @@ def generate_performance_graphs(excel_data):
             "kpi_total_interactions": total_interactions,
             "kpi_total_impressions": total_impressions,  # Nouveau KPI pour les impressions totales
             "recommendations": recommendations,
-            "combined_df": combined_df  # Pour le téléchargement
+            "combined_df": combined_df,  # Pour le téléchargement
+            "meilleurs_posts_combined": meilleurs_posts_combined  # Ajouté pour Top Posts
         }
 
     except Exception as e:
         st.error(f"Une erreur est survenue lors de la génération des graphiques : {e}")
         return None
+
+# Fonction pour obtenir les Top 5 Posts Performants
+def top_performing_posts(meilleurs_posts_combined, top_n=5):
+    top_posts = meilleurs_posts_combined.sort_values(by='Interactions', ascending=False).head(top_n)
+    return top_posts
 
 # Interface utilisateur
 st.sidebar.header("Paramètres")
@@ -291,6 +350,25 @@ if uploaded_file is not None:
     results = generate_performance_graphs(uploaded_file)
 
     if results:
+        # Calcul des Top Posts
+        top_posts = top_performing_posts(results["meilleurs_posts_combined"])
+
+        # Préparer le DataFrame des Top Posts avec URL cliquable
+        top_posts_display = top_posts[['URL', 'Date', 'Interactions', 'Impressions']].copy()
+        top_posts_display['Date'] = top_posts_display['Date'].dt.strftime('%d/%m/%Y')
+        top_posts_display['URL'] = top_posts_display['URL'].apply(make_clickable)
+
+        # Renommer les colonnes pour l'affichage
+        top_posts_display.rename(columns={
+            'URL': 'URL du Post',
+            'Date': 'Date de Publication',
+            'Interactions': 'Nombre d\'Interactions',
+            'Impressions': 'Nombre d\'Impressions'
+        }, inplace=True)
+
+        # Appliquer le format HTML pour les URL
+        top_posts_html = top_posts_display.to_html(escape=False, index=False)
+
         # Organisation des graphiques dans des onglets avec "Engagement et Abonnés" en premier
         tab_engagement, tab_posts, tab_advanced = st.tabs(["Engagement et Abonnés", "Performance des Posts", "Analyses Avancées"])
 
@@ -331,8 +409,9 @@ if uploaded_file is not None:
         with tab_posts:
             st.header("Performance des Posts")
 
-            # Indicateur supplémentaire : Total des Impressions (déjà dans KPI dans "Engagement et Abonnés")
-            # Si vous souhaitez afficher une autre mesure spécifique ici, vous pouvez l'ajouter
+            # Top 5 Posts Performants
+            st.subheader("Top 5 Posts Performants")
+            st.markdown(top_posts_html, unsafe_allow_html=True)
 
             # Disposition en deux colonnes : Nombre de Posts (Histogramme) et Impressions
             col1, col2 = st.columns(2)
@@ -386,6 +465,7 @@ if uploaded_file is not None:
                         fig = demographics_figures[category]
                         with cols[j]:
                             st.plotly_chart(fig, use_container_width=True)
+                st.markdown("<br>", unsafe_allow_html=True)  # Ajoute un espace entre les lignes
 
             # Section : Téléchargement des Données
             st.header("Télécharger les Données Analytiques")
