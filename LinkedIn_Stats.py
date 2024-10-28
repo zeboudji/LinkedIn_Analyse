@@ -220,11 +220,13 @@ def generate_performance_graphs(excel_data):
                 showlegend=True,
                 legend=dict(
                     orientation="h",
-                    yanchor="bottom",
+                    yanchor="top",
                     y=-0.2,
                     xanchor="center",
-                    x=0.5
-                )
+                    x=0.5,
+                    font=dict(size=10)  # Ajustez la taille selon vos besoins
+                ),
+                height=600  # Augmenter la hauteur pour accommoder la légende
             )
 
             demographics_figures[category] = fig
