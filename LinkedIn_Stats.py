@@ -22,7 +22,7 @@ def top_performing_posts(meilleurs_posts_df_clean):
     # Convertir les colonnes en types appropriés si ce n'est pas déjà fait
     meilleurs_posts_df_clean['Interactions'] = pd.to_numeric(meilleurs_posts_df_clean['Interactions'], errors='coerce')
     meilleurs_posts_df_clean['Impressions'] = pd.to_numeric(meilleurs_posts_df_clean['Impressions'], errors='coerce')
-    meilleurs_posts_df_clean['Date_de_publication_post'] = pd.to_datetime(meilleurs_posts_df_clean['Date_de_publication_post'], format='%d/%m/%Y', errors='coerce')
+    meilleurs_posts_df_clean['Date_de_publication_post'] = pd.to_datetime(meilleurs_posts_df_clean['Date_de_publication_post'], format='%Y-%m-%d', errors='coerce')
     
     # Trier les posts par le nombre d'interactions pour obtenir le top 5
     top_5_posts = meilleurs_posts_df_clean.sort_values(by='Interactions', ascending=False).head(5)
@@ -45,7 +45,8 @@ def generate_performance_graphs(excel_data):
         # Charger chaque feuille pertinente dans des dataframes
         engagement_df = pd.read_excel(xls, 'ENGAGEMENT')
         abonnes_df = pd.read_excel(xls, 'ABONNÉS', skiprows=2)
-        meilleurs_posts_df = pd.read_excel(xls, 'MEILLEURS POSTS').iloc[2:, 1:5]  # Ajusté pour inclure les colonnes nécessaires
+        # Lire toutes les colonnes nécessaires jusqu'à G (incluant Impressions)
+        meilleurs_posts_df = pd.read_excel(xls, 'MEILLEURS POSTS', skiprows=2, usecols="B:G")  # Ajustez 'B:G' selon votre fichier
         demographics_df = pd.read_excel(xls, 'DONNÉES DÉMOGRAPHIQUES')
 
         # Nettoyer les noms de colonnes pour enlever les espaces
@@ -54,15 +55,33 @@ def generate_performance_graphs(excel_data):
         meilleurs_posts_df.columns = meilleurs_posts_df.columns.str.strip()
         demographics_df.columns = demographics_df.columns.str.strip()
 
-        # Nettoyer les données des posts
-        meilleurs_posts_df.columns = ['Date_de_publication_post', 'Interactions', 'Impressions', 'URL_du_post']
-        meilleurs_posts_df['Date_de_publication_post'] = pd.to_datetime(meilleurs_posts_df['Date_de_publication_post'], format='%d/%m/%Y', errors='coerce')
-        meilleurs_posts_df['Interactions'] = pd.to_numeric(meilleurs_posts_df['Interactions'], errors='coerce')
-        meilleurs_posts_df['Impressions'] = pd.to_numeric(meilleurs_posts_df['Impressions'], errors='coerce')
-        posts_per_day = meilleurs_posts_df['Date_de_publication_post'].value_counts().sort_index()
+        # Vérifier les colonnes lues dans 'MEILLEURS POSTS'
+        st.write("Colonnes dans 'MEILLEURS POSTS':", meilleurs_posts_df.columns.tolist())
 
-        # Définir meilleurs_posts_df_clean correctement
-        meilleurs_posts_df_clean = meilleurs_posts_df.copy()
+        # Nettoyer les données des posts
+        # Assurez-vous que les noms correspondent exactement à ceux de votre fichier
+        # Par exemple, si les noms sont en français ou avec des accents, ajustez en conséquence
+        # Ici, je suppose les noms comme suit :
+        # 'URL_du_post', 'Date_de_publication_post', 'Interactions', 'Impressions', etc.
+        # Ajustez si nécessaire
+        # Si 'Impressions' est en colonne G, assurez-vous que cette colonne est bien lue
+        # Vous pouvez afficher les premières lignes pour vérifier
+        st.write("Données des meilleurs posts:", meilleurs_posts_df.head())
+
+        meilleurs_posts_df.columns = ['URL_du_post', 'Date_de_publication_post', 'Interactions', 'Impressions', 'Autre_colonne1', 'Autre_colonne2']  # Ajustez selon vos colonnes
+
+        # Sélectionner uniquement les colonnes nécessaires
+        meilleurs_posts_df_clean = meilleurs_posts_df[['URL_du_post', 'Date_de_publication_post', 'Interactions', 'Impressions']].copy()
+
+        # Convertir les types de données
+        meilleurs_posts_df_clean['Date_de_publication_post'] = pd.to_datetime(meilleurs_posts_df_clean['Date_de_publication_post'], format='%Y-%m-%d', errors='coerce')
+        meilleurs_posts_df_clean['Interactions'] = pd.to_numeric(meilleurs_posts_df_clean['Interactions'], errors='coerce')
+        meilleurs_posts_df_clean['Impressions'] = pd.to_numeric(meilleurs_posts_df_clean['Impressions'], errors='coerce')
+
+        # Remplir les NaN dans 'Impressions' si nécessaire, par exemple avec 0 ou une autre stratégie
+        meilleurs_posts_df_clean['Impressions'] = meilleurs_posts_df_clean['Impressions'].fillna(0)
+
+        posts_per_day = meilleurs_posts_df_clean['Date_de_publication_post'].value_counts().sort_index()
 
         # Nettoyer le dataframe des abonnés et calculer les abonnés cumulés
         abonnes_df_clean = abonnes_df.dropna()
