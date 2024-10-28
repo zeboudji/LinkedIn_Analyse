@@ -13,6 +13,29 @@ st.set_page_config(page_title="Analyse des Performances LinkedIn", layout="wide"
 def convert_df(df):
     return df.to_csv(index=False).encode('utf-8')
 
+# Fonction pour rendre les URL cliquables en HTML
+def make_clickable(url):
+    return f'<a href="{url}" target="_blank">{url}</a>'
+
+# Fonction pour afficher les Top 5 posts performants
+def top_performing_posts(meilleurs_posts_df_clean):
+    # Convertir les colonnes en types appropriés si ce n'est pas déjà fait
+    meilleurs_posts_df_clean['Interactions'] = pd.to_numeric(meilleurs_posts_df_clean['Interactions'], errors='coerce')
+    meilleurs_posts_df_clean['Impressions'] = pd.to_numeric(meilleurs_posts_df_clean['Impressions'], errors='coerce')
+    meilleurs_posts_df_clean['Date_de_publication_post'] = pd.to_datetime(meilleurs_posts_df_clean['Date_de_publication_post'], format='%d/%m/%Y', errors='coerce')
+    
+    # Trier les posts par le nombre d'interactions pour obtenir le top 5
+    top_5_posts = meilleurs_posts_df_clean.sort_values(by='Interactions', ascending=False).head(5)
+    
+    # Rendre les URL cliquables
+    top_5_posts['URL_du_post'] = top_5_posts['URL_du_post'].apply(lambda url: make_clickable(url))
+    
+    # Sélectionner les colonnes pertinentes pour l'affichage
+    top_5_posts_display = top_5_posts[['URL_du_post', 'Date_de_publication_post', 'Interactions', 'Impressions']].copy()
+    
+    # Retourner le tableau en HTML pour affichage dans Streamlit
+    return top_5_posts_display.to_html(escape=False, index=False)
+
 # Fonction pour générer les graphiques de performance
 def generate_performance_graphs(excel_data):
     try:
@@ -22,7 +45,7 @@ def generate_performance_graphs(excel_data):
         # Charger chaque feuille pertinente dans des dataframes
         engagement_df = pd.read_excel(xls, 'ENGAGEMENT')
         abonnes_df = pd.read_excel(xls, 'ABONNÉS', skiprows=2)
-        meilleurs_posts_df = pd.read_excel(xls, 'MEILLEURS POSTS').iloc[2:, 1:3]
+        meilleurs_posts_df = pd.read_excel(xls, 'MEILLEURS POSTS').iloc[2:, 1:5]  # Ajusté pour inclure les colonnes nécessaires
         demographics_df = pd.read_excel(xls, 'DONNÉES DÉMOGRAPHIQUES')
 
         # Nettoyer les noms de colonnes pour enlever les espaces
@@ -32,10 +55,11 @@ def generate_performance_graphs(excel_data):
         demographics_df.columns = demographics_df.columns.str.strip()
 
         # Nettoyer les données des posts
-        meilleurs_posts_df.columns = ['Date de publication', 'Interactions']
-        meilleurs_posts_df['Date de publication'] = pd.to_datetime(meilleurs_posts_df['Date de publication'], format='%d/%m/%Y', errors='coerce')
+        meilleurs_posts_df.columns = ['Date_de_publication_post', 'Interactions', 'Impressions', 'URL_du_post']
+        meilleurs_posts_df['Date_de_publication_post'] = pd.to_datetime(meilleurs_posts_df['Date_de_publication_post'], format='%d/%m/%Y', errors='coerce')
         meilleurs_posts_df['Interactions'] = pd.to_numeric(meilleurs_posts_df['Interactions'], errors='coerce')
-        posts_per_day = meilleurs_posts_df['Date de publication'].value_counts().sort_index()
+        meilleurs_posts_df['Impressions'] = pd.to_numeric(meilleurs_posts_df['Impressions'], errors='coerce')
+        posts_per_day = meilleurs_posts_df['Date_de_publication_post'].value_counts().sort_index()
 
         # Nettoyer le dataframe des abonnés et calculer les abonnés cumulés
         abonnes_df_clean = abonnes_df.dropna()
@@ -274,7 +298,8 @@ def generate_performance_graphs(excel_data):
             "kpi_total_interactions": total_interactions,
             "kpi_total_impressions": total_impressions,  # Nouveau KPI pour les impressions totales
             "recommendations": recommendations,
-            "combined_df": combined_df  # Pour le téléchargement
+            "combined_df": combined_df,  # Pour le téléchargement
+            "meilleurs_posts_df_clean": meilleurs_posts_df_clean  # Ajout pour le Top 5 des posts
         }
 
     except Exception as e:
@@ -331,8 +356,10 @@ if uploaded_file is not None:
         with tab_posts:
             st.header("Performance des Posts")
 
-            # Indicateur supplémentaire : Total des Impressions (déjà dans KPI dans "Engagement et Abonnés")
-            # Si vous souhaitez afficher une autre mesure spécifique ici, vous pouvez l'ajouter
+            # Affichage des Top 5 posts performants
+            st.subheader("Top 5 Posts Performants")
+            top_5_html = top_performing_posts(results["meilleurs_posts_df_clean"])
+            st.write(top_5_html, unsafe_allow_html=True)
 
             # Disposition en deux colonnes : Nombre de Posts (Histogramme) et Impressions
             col1, col2 = st.columns(2)
