@@ -39,7 +39,6 @@ def generate_performance_graphs(excel_data):
 
         # Nettoyer le dataframe des abonnés et calculer les abonnés cumulés
         abonnes_df_clean = abonnes_df.dropna()
-        # Vérifier le nom exact de la colonne Date dans abonnes_df_clean
         date_column_abonnes = [col for col in abonnes_df_clean.columns if 'Date' in col][0]
         abonnes_df_clean.rename(columns={date_column_abonnes: 'Date'}, inplace=True)
         abonnes_df_clean['Date'] = pd.to_datetime(abonnes_df_clean['Date'], format='%d/%m/%Y', errors='coerce')
@@ -64,103 +63,61 @@ def generate_performance_graphs(excel_data):
         combined_df = pd.merge(combined_df, abonnes_df_clean[['Date', 'Growth Rate']], on='Date', how='left')
         combined_df['Growth Rate'] = combined_df['Growth Rate'].fillna(0)
 
-        # **Extraire les dates de début et de fin**
+        # Extraire les dates de début et de fin
         start_date = combined_df['Date'].min().strftime('%d/%m/%Y')
         end_date = combined_df['Date'].max().strftime('%d/%m/%Y')
 
-        # **Mettre à jour le titre de l'application avec la période d'analyse**
+        # Mettre à jour le titre de l'application avec la période d'analyse
         st.title(f"Analyse des Performances Réseaux Sociaux - LinkedIn ({start_date} - {end_date})")
 
-        # Graphique 1 : Nombre de posts par jour (Bar Chart)
-        fig_posts = px.bar(combined_df, x='Date', y='Posts per Day',
-                           title='Nombre de Posts par Jour',
-                           labels={'Posts per Day': 'Nombre de posts'},
-                           template='plotly_dark')
-
-        # Explication pour le graphique 1
-        explanation_posts = """
-        **Interprétation :** Ce graphique montre le nombre de posts que vous avez publiés chaque jour. 
-        Une fréquence de publication régulière peut aider à maintenir l'engagement de votre audience. 
-        Identifiez les jours où vous publiez le plus ou le moins et ajustez votre stratégie en conséquence.
-        """
-
-        # Graphique 2 : Impressions au fil du temps (Line Chart)
-        fig_impressions = px.line(combined_df, x='Date', y='Impressions',
-                                  title='Impressions au Fil du Temps',
-                                  labels={'Impressions': 'Impressions'},
-                                  markers=True,
-                                  template='plotly_dark')
-
-        # Explication pour le graphique 2
-        explanation_impressions = """
-        **Interprétation :** Les impressions représentent le nombre de fois où vos posts ont été affichés. 
-        Une augmentation des impressions indique une portée plus large. Analysez les périodes de hausse pour comprendre ce qui a bien fonctionné.
-        """
-
-        # Graphique 3 : Interactions au fil du temps (Line Chart)
-        fig_interactions = px.line(combined_df, x='Date', y='Interactions',
-                                   title='Interactions au Fil du Temps',
-                                   labels={'Interactions': 'Interactions'},
-                                   markers=True,
-                                   template='plotly_dark')
-
-        # Explication pour le graphique 3
-        explanation_interactions = """
-        **Interprétation :** Les interactions incluent les likes, commentaires et partages de vos posts. 
-        Un nombre élevé d'interactions indique un bon engagement de votre audience. Identifiez les types de contenus qui génèrent le plus d'interactions.
-        """
-
-        # Graphique 4 : Taux d'engagement au fil du temps (Line Chart)
+        # Graphiques principaux (ordre d'importance)
+        # 1. Taux d'Engagement
         fig_engagement = px.line(combined_df, x='Date', y='Engagement Rate (%)',
                                  title='Taux d\'Engagement au Fil du Temps',
                                  labels={'Engagement Rate (%)': 'Taux d\'Engagement (%)'},
                                  markers=True,
                                  template='plotly_dark')
 
-        # Explication pour le graphique 4
-        explanation_engagement = """
-        **Interprétation :** Le taux d'engagement est calculé en divisant les interactions par les impressions. 
-        Un taux d'engagement élevé signifie que votre contenu résonne bien avec votre audience. Suivez ce taux pour évaluer l'efficacité de vos posts.
-        """
+        # 2. Impressions au Fil du Temps
+        fig_impressions = px.line(combined_df, x='Date', y='Impressions',
+                                  title='Impressions au Fil du Temps',
+                                  labels={'Impressions': 'Impressions'},
+                                  markers=True,
+                                  template='plotly_dark')
 
-        # Graphique 5 : Abonnés cumulés au fil du temps (Line Chart)
+        # 3. Interactions au Fil du Temps
+        fig_interactions = px.line(combined_df, x='Date', y='Interactions',
+                                   title='Interactions au Fil du Temps',
+                                   labels={'Interactions': 'Interactions'},
+                                   markers=True,
+                                   template='plotly_dark')
+
+        # 4. Abonnés Cumulés au Fil du Temps
         fig_subscribers = px.line(combined_df, x='Date', y='Cumulative Subscribers',
                                   title='Abonnés Cumulés au Fil du Temps',
                                   labels={'Cumulative Subscribers': 'Abonnés Cumulés'},
                                   markers=True,
                                   template='plotly_dark')
 
-        # Explication pour le graphique 5
-        explanation_subscribers = """
-        **Interprétation :** Ce graphique montre l'évolution du nombre total de vos abonnés. 
-        Une croissance constante des abonnés est un indicateur positif de votre visibilité et de votre influence sur LinkedIn.
-        """
+        # 5. Nombre de Posts par Jour
+        fig_posts = px.bar(combined_df, x='Date', y='Posts per Day',
+                           title='Nombre de Posts par Jour',
+                           labels={'Posts per Day': 'Nombre de posts'},
+                           template='plotly_dark')
 
-        # Graphique 6 : Corrélation entre abonnés cumulés et taux d'engagement (Scatter Plot)
+        # 6. Corrélation entre Abonnés Cumulés et Taux d'Engagement
         fig_corr_abonnes_engagement = px.scatter(combined_df, x='Cumulative Subscribers', y='Engagement Rate (%)',
                                                  title="Corrélation entre Abonnés Cumulés et Taux d'Engagement",
                                                  labels={'Cumulative Subscribers': 'Abonnés Cumulés', 'Engagement Rate (%)': 'Taux d\'Engagement (%)'},
                                                  trendline="ols", template='plotly_dark')
 
-        # Explication pour le graphique 6
-        explanation_corr_abonnes_engagement = """
-        **Interprétation :** Ce graphique de dispersion montre la relation entre le nombre d'abonnés cumulés et le taux d'engagement. 
-        Une tendance positive indique que l'augmentation du nombre d'abonnés est associée à un meilleur engagement. Cela peut aider à identifier si la croissance des abonnés influence directement l'engagement.
-        """
-
-        # Graphique 7 : Analyse des pics de croissance des abonnés (Line Chart)
+        # 7. Analyse des Pics de Croissance des Abonnés
         fig_growth_peaks = px.line(abonnes_df_clean, x='Date', y='Growth Rate',
                                    title="Analyse des Pics de Croissance des Abonnés",
                                    labels={'Date': 'Date', 'Growth Rate': 'Taux de Croissance (%)'},
                                    markers=True, template='plotly_dark')
 
-        # Explication pour le graphique 7
-        explanation_growth_peaks = """
-        **Interprétation :** Ce graphique montre les variations du taux de croissance des abonnés au fil du temps. 
-        Identifiez les périodes de forte croissance pour comprendre quels événements ou contenus ont contribué à l'augmentation rapide de vos abonnés.
-        """
-
-        # Graphique 8 : Matrice de Corrélation (Heatmap)
+        # 8. Matrice de Corrélation
         numeric_cols = ['Interactions', 'Impressions', 'Engagement Rate (%)', 'Cumulative Subscribers', 'Growth Rate']
         corr_matrix = combined_df[numeric_cols].corr()
 
@@ -178,39 +135,19 @@ def generate_performance_graphs(excel_data):
                                       template='plotly_dark',
                                       width=700, height=700)
 
-        # Explication pour la Matrice de Corrélation
-        explanation_corr_matrix = """
-        **Interprétation :** La matrice de corrélation montre les relations linéaires entre différentes variables clés. 
-        Des coefficients proches de 1 ou -1 indiquent une forte corrélation positive ou négative, respectivement. 
-        Cela aide à identifier quelles métriques sont étroitement liées et peuvent influencer votre stratégie de contenu.
-        """
-
-        # Graphique 9a : Corrélation entre Impressions et Interactions
+        # 9a. Corrélation entre Impressions et Interactions
         fig_corr_inter_impr = px.scatter(combined_df, x='Impressions', y='Interactions',
                                          title="Corrélation entre Impressions et Interactions",
                                          labels={'Impressions': 'Impressions', 'Interactions': 'Interactions'},
                                          trendline="ols", template='plotly_dark')
 
-        # Explication pour le graphique 9a
-        explanation_corr_inter_impr = """
-        **Interprétation :** Ce graphique examine la relation entre les impressions et les interactions. 
-        Une corrélation positive suggère que plus vos posts sont vus, plus ils génèrent d'interactions. 
-        Cela peut indiquer que l'augmentation des impressions pourrait directement améliorer l'engagement.
-        """
-
-        # Graphique 9b : Corrélation entre Posts par Jour et Taux d'Engagement
+        # 9b. Corrélation entre Posts par Jour et Taux d'Engagement
         fig_corr_posts_engagement = px.scatter(combined_df, x='Posts per Day', y='Engagement Rate (%)',
                                                title="Corrélation entre Nombre de Posts et Taux d'Engagement",
                                                labels={'Posts per Day': 'Nombre de Posts par Jour', 'Engagement Rate (%)': 'Taux d\'Engagement (%)'},
                                                trendline="ols", template='plotly_dark')
 
-        # Explication pour le graphique 9b
-        explanation_corr_posts_engagement = """
-        **Interprétation :** Ce graphique explore la relation entre la fréquence de publication et le taux d'engagement. 
-        Une corrélation positive pourrait indiquer que publier plus fréquemment améliore l'engagement, tandis qu'une corrélation négative pourrait suggérer que trop de posts peuvent diluer l'intérêt de votre audience.
-        """
-
-        # Graphique 10 : Régression Linéaire pour Prédire le Taux d'Engagement
+        # 10. Régression Linéaire pour Prédire le Taux d'Engagement
         def regression_engagement(combined_df):
             X = combined_df[['Impressions', 'Posts per Day', 'Cumulative Subscribers']]
             y = combined_df['Engagement Rate (%)']
@@ -229,13 +166,6 @@ def generate_performance_graphs(excel_data):
             return fig, r2
 
         fig_regression, r2_value = regression_engagement(combined_df)
-
-        # Explication pour le graphique 10
-        explanation_regression = f"""
-        **Interprétation :** Ce graphique montre la prédiction du taux d'engagement basé sur les impressions, le nombre de posts par jour et le nombre d'abonnés cumulés. 
-        Le coefficient de détermination (R² = {r2_value:.2f}) indique la proportion de la variance du taux d'engagement expliquée par le modèle. 
-        Un R² proche de 1 suggère que le modèle prédit bien le taux d'engagement.
-        """
 
         # Calcul des KPI
         mean_engagement_rate = combined_df['Engagement Rate (%)'].mean()
@@ -277,30 +207,20 @@ def generate_performance_graphs(excel_data):
             fig.update_layout(xaxis_tickangle=-45)
             demographics_figures[category] = fig
 
-        # Prepare the return dict
+        # Préparer le dictionnaire de retour
         return {
             "fig_posts": fig_posts,
-            "explanation_posts": explanation_posts,
             "fig_impressions": fig_impressions,
-            "explanation_impressions": explanation_impressions,
             "fig_interactions": fig_interactions,
-            "explanation_interactions": explanation_interactions,
             "fig_engagement": fig_engagement,
-            "explanation_engagement": explanation_engagement,
             "fig_subscribers": fig_subscribers,
-            "explanation_subscribers": explanation_subscribers,
             "fig_corr_abonnes_engagement": fig_corr_abonnes_engagement,
-            "explanation_corr_abonnes_engagement": explanation_corr_abonnes_engagement,
             "fig_growth_peaks": fig_growth_peaks,
-            "explanation_growth_peaks": explanation_growth_peaks,
             "fig_corr_matrix": fig_corr_matrix,
-            "explanation_corr_matrix": explanation_corr_matrix,
             "fig_corr_inter_impr": fig_corr_inter_impr,
-            "explanation_corr_inter_impr": explanation_corr_inter_impr,
             "fig_corr_posts_engagement": fig_corr_posts_engagement,
-            "explanation_corr_posts_engagement": explanation_corr_posts_engagement,
             "fig_regression": fig_regression,
-            "explanation_regression": explanation_regression,
+            "r2_value": r2_value,
             "demographics_figures": demographics_figures,
             "kpi_mean_engagement_rate": mean_engagement_rate,
             "kpi_mean_growth_rate": mean_growth_rate,
@@ -323,70 +243,122 @@ if uploaded_file is not None:
     results = generate_performance_graphs(uploaded_file)
 
     if results:
-        # Organisation des graphiques dans des onglets
-        tab1, tab2, tab3 = st.tabs(["Performance des Posts", "Engagement et Abonnés", "Analyses Avancées"])
+        # Organisation des graphiques par importance et disposition en matrice
+        st.header("Tableau de Bord des Performances LinkedIn")
 
-        with tab1:
-            st.plotly_chart(results["fig_posts"], use_container_width=True)
-            st.markdown(results["explanation_posts"])
+        # Section 1 : KPI et Recommandations
+        st.subheader("Indicateurs Clés de Performance (KPI)")
+        kpi1, kpi2, kpi3 = st.columns(3)
+        kpi1.metric("Taux d'Engagement Moyen", f"{results['kpi_mean_engagement_rate']:.2f}%")
+        kpi2.metric("Croissance Moyenne des Abonnés", f"{results['kpi_mean_growth_rate']:.2f}%")
+        kpi3.metric("Total des Interactions", f"{results['kpi_total_interactions']}")
 
-            st.plotly_chart(results["fig_impressions"], use_container_width=True)
-            st.markdown(results["explanation_impressions"])
+        st.subheader("Recommandations Basées sur les Analyses")
+        st.markdown(results["recommendations"])
 
-            st.plotly_chart(results["fig_interactions"], use_container_width=True)
-            st.markdown(results["explanation_interactions"])
+        # Section 2 : Graphiques Principaux
+        st.subheader("Analyse Principale")
 
-        with tab2:
+        # Disposition en colonnes : Taux d'Engagement et Impressions
+        col1, col2 = st.columns(2)
+        with col1:
             st.plotly_chart(results["fig_engagement"], use_container_width=True)
-            st.markdown(results["explanation_engagement"])
+            st.markdown("""
+            **Interprétation :** Le taux d'engagement est calculé en divisant les interactions par les impressions. 
+            Un taux d'engagement élevé signifie que votre contenu résonne bien avec votre audience. Suivez ce taux pour évaluer l'efficacité de vos posts.
+            """)
 
+        with col2:
+            st.plotly_chart(results["fig_impressions"], use_container_width=True)
+            st.markdown("""
+            **Interprétation :** Les impressions représentent le nombre de fois où vos posts ont été affichés. 
+            Une augmentation des impressions indique une portée plus large. Analysez les périodes de hausse pour comprendre ce qui a bien fonctionné.
+            """)
+
+        # Disposition en colonnes : Interactions et Abonnés Cumulés
+        col3, col4 = st.columns(2)
+        with col3:
+            st.plotly_chart(results["fig_interactions"], use_container_width=True)
+            st.markdown("""
+            **Interprétation :** Les interactions incluent les likes, commentaires et partages de vos posts. 
+            Un nombre élevé d'interactions indique un bon engagement de votre audience. Identifiez les types de contenus qui génèrent le plus d'interactions.
+            """)
+
+        with col4:
             st.plotly_chart(results["fig_subscribers"], use_container_width=True)
-            st.markdown(results["explanation_subscribers"])
+            st.markdown("""
+            **Interprétation :** Ce graphique montre l'évolution du nombre total de vos abonnés. 
+            Une croissance constante des abonnés est un indicateur positif de votre visibilité et de votre influence sur LinkedIn.
+            """)
 
+        # Section 3 : Corrélations et Régression
+        st.subheader("Analyses Avancées")
+
+        # Disposition en deux colonnes pour les corrélations
+        col5, col6 = st.columns(2)
+        with col5:
             st.plotly_chart(results["fig_corr_abonnes_engagement"], use_container_width=True)
-            st.markdown(results["explanation_corr_abonnes_engagement"])
+            st.markdown("""
+            **Interprétation :** Ce graphique de dispersion montre la relation entre le nombre d'abonnés cumulés et le taux d'engagement. 
+            Une tendance positive indique que l'augmentation du nombre d'abonnés est associée à un meilleur engagement. Cela peut aider à identifier si la croissance des abonnés influence directement l'engagement.
+            """)
 
+        with col6:
             st.plotly_chart(results["fig_growth_peaks"], use_container_width=True)
-            st.markdown(results["explanation_growth_peaks"])
+            st.markdown("""
+            **Interprétation :** Ce graphique montre les variations du taux de croissance des abonnés au fil du temps. 
+            Identifiez les périodes de forte croissance pour comprendre quels événements ou contenus ont contribué à l'augmentation rapide de vos abonnés.
+            """)
 
-        with tab3:
-            st.header("Matrice de Corrélation")
-            st.plotly_chart(results["fig_corr_matrix"], use_container_width=True)
-            st.markdown(results["explanation_corr_matrix"])
-
-            st.header("Corrélations Supplémentaires")
+        # Disposition en deux colonnes pour les corrélations supplémentaires
+        col7, col8 = st.columns(2)
+        with col7:
             st.plotly_chart(results["fig_corr_inter_impr"], use_container_width=True)
-            st.markdown(results["explanation_corr_inter_impr"])
+            st.markdown("""
+            **Interprétation :** Ce graphique examine la relation entre les impressions et les interactions. 
+            Une corrélation positive suggère que plus vos posts sont vus, plus ils génèrent d'interactions. 
+            Cela peut indiquer que l'augmentation des impressions pourrait directement améliorer l'engagement.
+            """)
 
+        with col8:
             st.plotly_chart(results["fig_corr_posts_engagement"], use_container_width=True)
-            st.markdown(results["explanation_corr_posts_engagement"])
+            st.markdown("""
+            **Interprétation :** Ce graphique explore la relation entre la fréquence de publication et le taux d'engagement. 
+            Une corrélation positive pourrait indiquer que publier plus fréquemment améliore l'engagement, tandis qu'une corrélation négative pourrait suggérer que trop de posts peuvent diluer l'intérêt de votre audience.
+            """)
 
-            st.header("Régression Linéaire pour le Taux d'Engagement")
-            st.plotly_chart(results["fig_regression"], use_container_width=True)
-            st.markdown(results["explanation_regression"])
+        # Section 4 : Matrice de Corrélation
+        st.subheader("Matrice de Corrélation")
+        st.plotly_chart(results["fig_corr_matrix"], use_container_width=True)
+        st.markdown("""
+        **Interprétation :** La matrice de corrélation montre les relations linéaires entre différentes variables clés. 
+        Des coefficients proches de 1 ou -1 indiquent une forte corrélation positive ou négative, respectivement. 
+        Cela aide à identifier quelles métriques sont étroitement liées et peuvent influencer votre stratégie de contenu.
+        """)
 
-            st.header("Indicateurs Clés de Performance (KPI)")
-            kpi1, kpi2, kpi3 = st.columns(3)
-            kpi1.metric("Taux d'Engagement Moyen", f"{results['kpi_mean_engagement_rate']:.2f}%")
-            kpi2.metric("Croissance Moyenne des Abonnés", f"{results['kpi_mean_growth_rate']:.2f}%")
-            kpi3.metric("Total des Interactions", f"{results['kpi_total_interactions']}")
+        # Section 5 : Régression Linéaire
+        st.subheader("Régression Linéaire pour le Taux d'Engagement")
+        st.plotly_chart(results["fig_regression"], use_container_width=True)
+        st.markdown(f"""
+        **Interprétation :** Ce graphique montre la prédiction du taux d'engagement basé sur les impressions, le nombre de posts par jour et le nombre d'abonnés cumulés. 
+        Le coefficient de détermination (R² = {results['r2_value']:.2f}) indique la proportion de la variance du taux d'engagement expliquée par le modèle. 
+        Un R² proche de 1 suggère que le modèle prédit bien le taux d'engagement.
+        """)
 
-            st.header("Recommandations Basées sur les Analyses")
-            st.markdown(results["recommendations"])
+        # Section 6 : Données Démographiques
+        st.subheader("Données Démographiques")
+        for category, fig in results["demographics_figures"].items():
+            st.plotly_chart(fig, use_container_width=True)
 
-            st.header("Données Démographiques")
-            for category, fig in results["demographics_figures"].items():
-                st.plotly_chart(fig, use_container_width=True)
-
-            # Option pour télécharger les données analysées
-            st.header("Télécharger les Données Analytiques")
-            csv = convert_df(results["combined_df"])
-            st.download_button(
-                label="Télécharger les Données Analytiques",
-                data=csv,
-                file_name='analyse_linkedin.csv',
-                mime='text/csv',
-            )
+        # Section 7 : Téléchargement des Données
+        st.subheader("Télécharger les Données Analytiques")
+        csv = convert_df(results["combined_df"])
+        st.download_button(
+            label="Télécharger les Données Analytiques",
+            data=csv,
+            file_name='analyse_linkedin.csv',
+            mime='text/csv',
+        )
     else:
         st.error("Erreur dans la génération des graphiques. Veuillez vérifier vos données.")
 else:
