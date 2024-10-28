@@ -1,6 +1,7 @@
 import pandas as pd 
 import streamlit as st
 import plotly.express as px
+import plotly.graph_objects as go
 import plotly.figure_factory as ff
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import r2_score
@@ -231,6 +232,65 @@ def generate_performance_graphs(excel_data):
 
             demographics_figures[category] = fig
 
+        # Création du Graphique Combiné : Posts, Impressions, Interactions par Jour
+        fig_combined = go.Figure()
+
+        # Ajouter les Posts par Jour en tant que Barres
+        fig_combined.add_trace(go.Bar(
+            x=combined_df['Date'],
+            y=combined_df['Posts per Day'],
+            name='Nombre de Posts',
+            marker_color='indianred'
+        ))
+
+        # Ajouter les Impressions par Jour en tant que Ligne avec Axe Y secondaire
+        fig_combined.add_trace(go.Scatter(
+            x=combined_df['Date'],
+            y=combined_df['Impressions'],
+            name='Impressions',
+            mode='lines+markers',
+            marker=dict(color='blue'),
+            yaxis='y2'
+        ))
+
+        # Ajouter les Interactions par Jour en tant que Ligne avec Axe Y secondaire
+        fig_combined.add_trace(go.Scatter(
+            x=combined_df['Date'],
+            y=combined_df['Interactions'],
+            name='Interactions',
+            mode='lines+markers',
+            marker=dict(color='green'),
+            yaxis='y2'
+        ))
+
+        # Mise en page du graphique combiné
+        fig_combined.update_layout(
+            title='Nombre de Posts, Impressions et Interactions par Jour',
+            xaxis=dict(title='Date'),
+            yaxis=dict(
+                title='Nombre de Posts',
+                titlefont=dict(color='indianred'),
+                tickfont=dict(color='indianred')
+            ),
+            yaxis2=dict(
+                title='Impressions / Interactions',
+                titlefont=dict(color='blue'),
+                tickfont=dict(color='blue'),
+                overlaying='y',
+                side='right'
+            ),
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=1.02,
+                xanchor="center",
+                x=0.5
+            ),
+            template='plotly_dark',
+            barmode='group',
+            height=600
+        )
+
         # Préparer le dictionnaire de retour
         return {
             "fig_posts_bar": fig_posts_bar,
@@ -291,6 +351,11 @@ def generate_performance_graphs(excel_data):
             **Interprétation :** Ce graphique montre la prédiction du taux d'engagement basé sur les impressions, le nombre de posts par jour et le nombre d'abonnés cumulés. 
             Le coefficient de détermination (R² = {r2_value:.2f}) indique la proportion de la variance du taux d'engagement expliquée par le modèle. 
             Un R² proche de 1 suggère que le modèle prédit bien le taux d'engagement.
+            """,
+            "fig_combined": fig_combined,
+            "explanation_combined": """
+            **Interprétation :** Ce graphique combiné affiche le nombre de posts par jour sous forme de barres, ainsi que les impressions et les interactions par jour sous forme de lignes. 
+            Cela permet de visualiser simultanément la fréquence des publications et leur impact en termes de portée et d'engagement.
             """,
             "demographics_figures": demographics_figures,
             "kpi_mean_engagement_rate": mean_engagement_rate,
@@ -386,6 +451,17 @@ if uploaded_file is not None:
 
         with tab_posts:
             st.header("Performance des Posts")
+
+            # Graphique Combiné : Posts, Impressions, Interactions par Jour
+            st.subheader("Nombre de Posts, Impressions et Interactions par Jour")
+            st.plotly_chart(results["fig_combined"], use_container_width=True)
+            st.markdown(results["explanation_combined"])
+            st.download_button(
+                label="Télécharger ce graphique en PNG",
+                data=fig_to_png(results["fig_combined"]),
+                file_name="combined_posts_impressions_interactions.png",
+                mime="image/png",
+            )
 
             # Disposition en deux colonnes : Nombre de Posts (Histogramme) et Impressions
             col1, col2 = st.columns(2)
