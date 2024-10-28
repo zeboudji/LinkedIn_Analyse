@@ -236,9 +236,15 @@ def generate_performance_graphs(excel_data):
             df_category = df_category.sort_values(by='Pourcentage', ascending=False)
 
             # Regrouper les petites catégories en "Autres" si nécessaire
-            threshold = 5  # Seuil de pourcentage pour regrouper
+            threshold = 3  # Réduire le seuil pour éviter que tout soit "Autres"
             df_category.loc[df_category['Pourcentage'] < threshold, 'Valeur'] = 'Autres'
             df_category = df_category.groupby('Valeur', as_index=False).sum()
+
+            # Vérifier si après regroupement, il y a au moins deux catégories
+            if len(df_category) < 2:
+                # Si toutes les valeurs sont "Autres", afficher les catégories sans regroupement
+                df_category = demographics_df[demographics_df['Principales données démographiques'] == category].copy()
+                df_category = df_category.groupby('Valeur', as_index=False).sum()
 
             # Créer un graphique en camembert pour chaque catégorie avec améliorations
             fig = px.pie(df_category, values='Pourcentage', names='Valeur',
@@ -334,37 +340,61 @@ def generate_performance_graphs(excel_data):
             ),
             template='plotly_dark',
             barmode='group',
-            height=600
+            height=700
         )
 
-        # Création du Nouveau Graphique Combiné : Impressions et Interactions par Jour
+        # Création du Nouveau Graphique Combiné : Impressions et Interactions par Jour avec 3 axes Y
         fig_impr_inter = go.Figure()
 
-        # Ajouter les Impressions par Jour en tant que Ligne
+        # Ajouter les Impressions par Jour en tant que Ligne avec Axe Y2
         fig_impr_inter.add_trace(go.Scatter(
             x=combined_df['Date'],
             y=combined_df['Impressions'],
             name='Impressions',
             mode='lines+markers',
             marker=dict(color=color_palette['Impressions'], size=8),
-            line=dict(width=2)
+            line=dict(width=2),
+            yaxis='y2'
         ))
 
-        # Ajouter les Interactions par Jour en tant que Ligne
+        # Ajouter les Interactions par Jour en tant que Ligne avec Axe Y3
         fig_impr_inter.add_trace(go.Scatter(
             x=combined_df['Date'],
             y=combined_df['Interactions'],
             name='Interactions',
             mode='lines+markers',
             marker=dict(color=color_palette['Interactions'], size=10, symbol='diamond'),
-            line=dict(width=3, dash='dot')
+            line=dict(width=3, dash='dot'),
+            yaxis='y3'
         ))
 
-        # Mise en page du nouveau graphique combiné
+        # Mise en page du nouveau graphique combiné avec 3 axes Y
         fig_impr_inter.update_layout(
             title='Impressions et Interactions par Jour',
             xaxis=dict(title='Date'),
-            yaxis=dict(title='Nombre'),
+            yaxis=dict(
+                title='Impressions',
+                titlefont=dict(color=color_palette['Impressions']),
+                tickfont=dict(color=color_palette['Impressions'])
+            ),
+            yaxis2=dict(
+                title='Interactions',
+                titlefont=dict(color=color_palette['Interactions']),
+                tickfont=dict(color=color_palette['Interactions']),
+                overlaying='y',
+                side='right',
+                position=0.85,  # Positionner y2 légèrement à gauche
+                showgrid=False
+            ),
+            yaxis3=dict(
+                title='Interactions',
+                titlefont=dict(color=color_palette['Interactions']),
+                tickfont=dict(color=color_palette['Interactions']),
+                overlaying='y',
+                side='right',
+                position=0.95,  # Positionner y3 légèrement à droite de y2
+                showgrid=False
+            ),
             legend=dict(
                 orientation="h",
                 yanchor="bottom",
@@ -373,7 +403,7 @@ def generate_performance_graphs(excel_data):
                 x=0.5
             ),
             template='plotly_dark',
-            height=600
+            height=700
         )
 
         # Préparer le dictionnaire de retour
@@ -444,7 +474,7 @@ def generate_performance_graphs(excel_data):
             """,
             "fig_impr_inter": fig_impr_inter,
             "explanation_impr_inter": """
-            **Interprétation :** Ce graphique combiné affiche les impressions et les interactions par jour sous forme de lignes. 
+            **Interprétation :** Ce graphique combiné affiche les impressions et les interactions par jour sous forme de lignes avec des axes Y séparés. 
             Cela permet de comparer directement la portée de vos posts avec le niveau d'engagement généré.
             """,
             "demographics_figures": demographics_figures,
@@ -483,7 +513,7 @@ if uploaded_file is not None:
             kpi2.metric("Croissance Moyenne des Abonnés", f"{results['kpi_mean_growth_rate']:.2f}%")
             kpi3.metric("Total des Interactions", f"{results['kpi_total_interactions']}")
             kpi4.metric("Total des Impressions", f"{results['kpi_total_impressions']}")
-
+    
             st.subheader("Recommandations Basées sur les Analyses")
             st.markdown(results["recommendations"])
 
@@ -553,7 +583,7 @@ if uploaded_file is not None:
                 mime="image/png",
             )
 
-            # Nouveau Graphique Combiné : Impressions et Interactions par Jour
+            # Nouveau Graphique Combiné : Impressions et Interactions par Jour avec 3 axes Y
             st.subheader("Impressions et Interactions par Jour")
             st.plotly_chart(results["fig_impr_inter"], use_container_width=True)
             st.markdown(results["explanation_impr_inter"])
