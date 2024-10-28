@@ -61,6 +61,9 @@ def generate_performance_graphs(excel_data):
         meilleurs_posts_df['Impressions'] = pd.to_numeric(meilleurs_posts_df['Impressions'], errors='coerce')
         posts_per_day = meilleurs_posts_df['Date_de_publication_post'].value_counts().sort_index()
 
+        # Définir meilleurs_posts_df_clean correctement
+        meilleurs_posts_df_clean = meilleurs_posts_df.copy()
+
         # Nettoyer le dataframe des abonnés et calculer les abonnés cumulés
         abonnes_df_clean = abonnes_df.dropna()
         date_column_abonnes = [col for col in abonnes_df_clean.columns if 'Date' in col][0]
