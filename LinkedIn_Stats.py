@@ -76,14 +76,14 @@ def generate_performance_graphs(excel_data):
         # Mettre à jour le titre de l'application avec la période d'analyse
         st.title(f"Analyse des Performances Réseaux Sociaux - LinkedIn ({start_date} - {end_date})")
 
-        # Définir une palette de couleurs cohérente et attrayante
+        # Définir une palette de couleurs cohérente
         color_palette = {
-            'Posts per Day': 'rgba(54, 162, 235, 0.8)',        # Bleu
-            'Impressions': 'rgba(255, 99, 132, 0.8)',         # Rouge
-            'Interactions': 'rgba(75, 192, 192, 0.8)',        # Vert
-            'Engagement Rate (%)': 'rgba(255, 206, 86, 0.8)', # Jaune
-            'Cumulative Subscribers': 'rgba(153, 102, 255, 0.8)', # Violet
-            'Growth Rate': 'rgba(255, 159, 64, 0.8)'          # Orange
+            'Posts per Day': 'indianred',
+            'Impressions': 'steelblue',
+            'Interactions': 'seagreen',
+            'Engagement Rate (%)': 'orange',
+            'Cumulative Subscribers': 'gold',
+            'Growth Rate': 'purple'
         }
 
         # Graphiques principaux (ordre d'importance)
@@ -235,17 +235,12 @@ def generate_performance_graphs(excel_data):
             # Trier les valeurs par pourcentage décroissant
             df_category = df_category.sort_values(by='Pourcentage', ascending=False)
 
-            # Regrouper les petites catégories en "Autres" si nécessaire
-            threshold = 5  # Seuil de pourcentage pour regrouper
-            df_category.loc[df_category['Pourcentage'] < threshold, 'Valeur'] = 'Autres'
-            df_category = df_category.groupby('Valeur', as_index=False).sum()
-
             # Créer un graphique en camembert pour chaque catégorie avec améliorations
             fig = px.pie(df_category, values='Pourcentage', names='Valeur',
                          title=f'Distribution de {category}',
                          template='plotly_dark',
                          hole=0.3,
-                         color_discrete_sequence=px.colors.qualitative.Bold)
+                         color_discrete_sequence=px.colors.sequential.Plasma)
 
             # Ajouter des étiquettes de pourcentage et placer la légende en dessous
             fig.update_traces(textinfo='percent+label', textposition='inside')
@@ -257,7 +252,7 @@ def generate_performance_graphs(excel_data):
                     y=-0.2,
                     xanchor="center",
                     x=0.5,
-                    font=dict(size=10)
+                    font=dict(size=10)  # Ajustez la taille selon vos besoins
                 ),
                 height=600  # Augmenter la hauteur pour accommoder la légende
             )
@@ -272,8 +267,7 @@ def generate_performance_graphs(excel_data):
             x=combined_df['Date'],
             y=combined_df['Posts per Day'],
             name='Nombre de Posts',
-            marker_color=color_palette['Posts per Day'],
-            opacity=0.6
+            marker_color=color_palette['Posts per Day']
         ))
 
         # Ajouter les Impressions par Jour en tant que Ligne avec Axe Y secondaire
@@ -282,8 +276,7 @@ def generate_performance_graphs(excel_data):
             y=combined_df['Impressions'],
             name='Impressions',
             mode='lines+markers',
-            marker=dict(color=color_palette['Impressions'], size=8),
-            line=dict(width=2),
+            marker=dict(color=color_palette['Impressions']),
             yaxis='y2'
         ))
 
@@ -293,8 +286,7 @@ def generate_performance_graphs(excel_data):
             y=combined_df['Interactions'],
             name='Interactions',
             mode='lines+markers',
-            marker=dict(color=color_palette['Interactions'], size=10, symbol='diamond'),
-            line=dict(width=3, dash='dot'),
+            marker=dict(color=color_palette['Interactions']),
             yaxis='y2'
         ))
 
@@ -312,8 +304,7 @@ def generate_performance_graphs(excel_data):
                 titlefont=dict(color=color_palette['Impressions']),
                 tickfont=dict(color=color_palette['Impressions']),
                 overlaying='y',
-                side='right',
-                showgrid=False
+                side='right'
             ),
             legend=dict(
                 orientation="h",
@@ -336,7 +327,7 @@ def generate_performance_graphs(excel_data):
             y=combined_df['Impressions'],
             name='Impressions',
             mode='lines+markers',
-            marker=dict(color=color_palette['Impressions'], size=8),
+            marker=dict(color=color_palette['Impressions']),
             line=dict(width=2)
         ))
 
@@ -346,8 +337,8 @@ def generate_performance_graphs(excel_data):
             y=combined_df['Interactions'],
             name='Interactions',
             mode='lines+markers',
-            marker=dict(color=color_palette['Interactions'], size=10, symbol='diamond'),
-            line=dict(width=3, dash='dot')
+            marker=dict(color=color_palette['Interactions']),
+            line=dict(width=2)
         ))
 
         # Mise en page du nouveau graphique combiné
