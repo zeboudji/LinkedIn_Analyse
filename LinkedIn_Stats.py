@@ -78,12 +78,12 @@ def generate_performance_graphs(excel_data):
 
         # Définir une palette de couleurs cohérente et attrayante
         color_palette = {
-            'Posts per Day': 'rgba(255, 99, 132, 0.7)',        # Rouge
-            'Impressions': 'rgba(54, 162, 235, 0.7)',         # Bleu
-            'Interactions': 'rgba(75, 192, 192, 0.7)',        # Vert
-            'Engagement Rate (%)': 'rgba(255, 159, 64, 0.7)', # Orange
-            'Cumulative Subscribers': 'rgba(153, 102, 255, 0.7)', # Violet
-            'Growth Rate': 'rgba(255, 206, 86, 0.7)'          # Jaune
+            'Posts per Day': 'rgba(54, 162, 235, 0.8)',        # Bleu
+            'Impressions': 'rgba(255, 99, 132, 0.8)',         # Rouge
+            'Interactions': 'rgba(75, 192, 192, 0.8)',        # Vert
+            'Engagement Rate (%)': 'rgba(255, 206, 86, 0.8)', # Jaune
+            'Cumulative Subscribers': 'rgba(153, 102, 255, 0.8)', # Violet
+            'Growth Rate': 'rgba(255, 159, 64, 0.8)'          # Orange
         }
 
         # Graphiques principaux (ordre d'importance)
@@ -282,7 +282,7 @@ def generate_performance_graphs(excel_data):
             y=combined_df['Impressions'],
             name='Impressions',
             mode='lines+markers',
-            marker=dict(color=color_palette['Impressions']),
+            marker=dict(color=color_palette['Impressions'], size=8),
             line=dict(width=2),
             yaxis='y2'
         ))
@@ -293,8 +293,8 @@ def generate_performance_graphs(excel_data):
             y=combined_df['Interactions'],
             name='Interactions',
             mode='lines+markers',
-            marker=dict(color=color_palette['Interactions']),
-            line=dict(width=2),
+            marker=dict(color=color_palette['Interactions'], size=10, symbol='diamond'),
+            line=dict(width=3, dash='dot'),
             yaxis='y2'
         ))
 
@@ -312,7 +312,8 @@ def generate_performance_graphs(excel_data):
                 titlefont=dict(color=color_palette['Impressions']),
                 tickfont=dict(color=color_palette['Impressions']),
                 overlaying='y',
-                side='right'
+                side='right',
+                showgrid=False
             ),
             legend=dict(
                 orientation="h",
@@ -335,7 +336,7 @@ def generate_performance_graphs(excel_data):
             y=combined_df['Impressions'],
             name='Impressions',
             mode='lines+markers',
-            marker=dict(color=color_palette['Impressions']),
+            marker=dict(color=color_palette['Impressions'], size=8),
             line=dict(width=2)
         ))
 
@@ -345,8 +346,8 @@ def generate_performance_graphs(excel_data):
             y=combined_df['Interactions'],
             name='Interactions',
             mode='lines+markers',
-            marker=dict(color=color_palette['Interactions']),
-            line=dict(width=2)
+            marker=dict(color=color_palette['Interactions'], size=10, symbol='diamond'),
+            line=dict(width=3, dash='dot')
         ))
 
         # Mise en page du nouveau graphique combiné
@@ -684,4 +685,3 @@ if uploaded_file is not None:
         st.error("Erreur dans la génération des graphiques. Veuillez vérifier vos données.")
 else:
     st.info("Veuillez télécharger un fichier Excel pour commencer l'analyse.")
-
