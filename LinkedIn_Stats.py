@@ -99,27 +99,11 @@ def generate_performance_graphs(excel_data):
                                   markers=True,
                                   template='plotly_dark')
 
-        # 5. Nombre de Posts par Jour (Conversion en Camembert avec chiffres entiers et en français)
-        # Mapper les noms des jours en français
-        day_mapping = {
-            'Monday': 'Lundi',
-            'Tuesday': 'Mardi',
-            'Wednesday': 'Mercredi',
-            'Thursday': 'Jeudi',
-            'Friday': 'Vendredi',
-            'Saturday': 'Samedi',
-            'Sunday': 'Dimanche'
-        }
-        combined_df['Day of Week'] = combined_df['Date'].dt.day_name().map(day_mapping)
-        posts_per_day_of_week = combined_df.groupby('Day of Week')['Posts per Day'].sum().reindex([
-            'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'
-        ]).fillna(0)
-
-        fig_posts_pie = px.pie(values=posts_per_day_of_week.values, names=posts_per_day_of_week.index,
-                              title='Répartition des Posts par Jour de la Semaine',
-                              template='plotly_dark',
-                              labels={'labels': 'Jour de la Semaine', 'values': 'Nombre de Posts'},
-                              hole=0.3)
+        # 5. Nombre de Posts par Jour (Histogramme)
+        fig_posts_bar = px.bar(combined_df, x='Date', y='Posts per Day',
+                               title='Nombre de Posts par Jour',
+                               labels={'Posts per Day': 'Nombre de posts', 'Date': 'Date'},
+                               template='plotly_dark')
 
         # 6. Corrélation entre Abonnés Cumulés et Taux d'Engagement
         fig_corr_abonnes_engagement = px.scatter(combined_df, x='Cumulative Subscribers', y='Engagement Rate (%)',
@@ -187,6 +171,7 @@ def generate_performance_graphs(excel_data):
         mean_engagement_rate = combined_df['Engagement Rate (%)'].mean()
         mean_growth_rate = combined_df['Growth Rate'].mean()
         total_interactions = combined_df['Interactions'].sum()
+        total_impressions = combined_df['Impressions'].sum()  # Nouveau KPI pour les impressions totales
 
         # Recommandations Basées sur les Analyses
         recommendations = """
@@ -224,10 +209,11 @@ def generate_performance_graphs(excel_data):
 
         # Préparer le dictionnaire de retour
         return {
-            "fig_posts_pie": fig_posts_pie,
-            "explanation_posts_pie": """
-            **Interprétation :** Ce camembert représente la répartition des posts par jour de la semaine. 
-            Cela permet d'identifier les jours où vous êtes le plus actif et ceux où vous pourriez augmenter ou réduire la fréquence de publication.
+            "fig_posts_bar": fig_posts_bar,
+            "explanation_posts_bar": """
+            **Interprétation :** Cet histogramme montre le nombre de posts publiés chaque jour. 
+            Une fréquence de publication régulière peut aider à maintenir l'engagement de votre audience. 
+            Identifiez les jours où vous publiez le plus ou le moins et ajustez votre stratégie en conséquence.
             """,
             "fig_impressions": fig_impressions,
             "explanation_impressions": """
@@ -286,6 +272,7 @@ def generate_performance_graphs(excel_data):
             "kpi_mean_engagement_rate": mean_engagement_rate,
             "kpi_mean_growth_rate": mean_growth_rate,
             "kpi_total_interactions": total_interactions,
+            "kpi_total_impressions": total_impressions,  # Nouveau KPI pour les impressions totales
             "recommendations": recommendations,
             "combined_df": combined_df  # Pour le téléchargement
         }
@@ -305,17 +292,18 @@ if uploaded_file is not None:
 
     if results:
         # Organisation des graphiques dans des onglets avec "Engagement et Abonnés" en premier
-        tab2, tab1, tab3 = st.tabs(["Engagement et Abonnés", "Performance des Posts", "Analyses Avancées"])
+        tab_engagement, tab_posts, tab_advanced = st.tabs(["Engagement et Abonnés", "Performance des Posts", "Analyses Avancées"])
 
-        with tab2:
+        with tab_engagement:
             st.header("Engagement et Abonnés")
 
             # Indicateurs Clés de Performance (KPI)
             st.subheader("Indicateurs Clés de Performance (KPI)")
-            kpi1, kpi2, kpi3 = st.columns(3)
+            kpi1, kpi2, kpi3, kpi4 = st.columns(4)
             kpi1.metric("Taux d'Engagement Moyen", f"{results['kpi_mean_engagement_rate']:.2f}%")
             kpi2.metric("Croissance Moyenne des Abonnés", f"{results['kpi_mean_growth_rate']:.2f}%")
             kpi3.metric("Total des Interactions", f"{results['kpi_total_interactions']}")
+            kpi4.metric("Total des Impressions", f"{results['kpi_total_impressions']}")
 
             st.subheader("Recommandations Basées sur les Analyses")
             st.markdown(results["recommendations"])
@@ -340,14 +328,14 @@ if uploaded_file is not None:
                 st.plotly_chart(results["fig_regression"], use_container_width=True)
                 st.markdown(results["explanation_regression"])
 
-        with tab1:
+        with tab_posts:
             st.header("Performance des Posts")
 
-            # Disposition en deux colonnes : Nombre de Posts (Camembert) et Impressions
+            # Disposition en deux colonnes : Nombre de Posts (Histogramme) et Impressions
             col1, col2 = st.columns(2)
             with col1:
-                st.plotly_chart(results["fig_posts_pie"], use_container_width=True)
-                st.markdown(results["explanation_posts_pie"])
+                st.plotly_chart(results["fig_posts_bar"], use_container_width=True)
+                st.markdown(results["explanation_posts_bar"])
 
             with col2:
                 st.plotly_chart(results["fig_impressions"], use_container_width=True)
@@ -363,7 +351,10 @@ if uploaded_file is not None:
                 st.plotly_chart(results["fig_engagement"], use_container_width=True)
                 st.markdown(results["explanation_engagement"])
 
-        with tab3:
+            # Ajout du KPI pour les impressions totales (déjà dans KPI dans "Engagement et Abonnés")
+            # Si vous souhaitez afficher une autre mesure spécifique ici, vous pouvez l'ajouter
+
+        with tab_advanced:
             st.header("Analyses Avancées")
 
             # Affichage de la Matrice de Corrélation en grand
