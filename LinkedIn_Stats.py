@@ -22,7 +22,7 @@ def generate_performance_graphs(excel_data):
         # Charger chaque feuille pertinente dans des dataframes
         engagement_df = pd.read_excel(xls, 'ENGAGEMENT')
         abonnes_df = pd.read_excel(xls, 'ABONNÉS', skiprows=2)
-        meilleurs_posts_df = pd.read_excel(xls, 'MEILLEURS POSTS').iloc[2:, 1:3]
+        meilleurs_posts_df = pd.read_excel(xls, 'MEILLEURS POSTS')
         demographics_df = pd.read_excel(xls, 'DONNÉES DÉMOGRAPHIQUES')
 
         # Nettoyer les noms de colonnes pour enlever les espaces
@@ -31,11 +31,31 @@ def generate_performance_graphs(excel_data):
         meilleurs_posts_df.columns = meilleurs_posts_df.columns.str.strip()
         demographics_df.columns = demographics_df.columns.str.strip()
 
+        # Séparer les données des posts en deux DataFrames
+        meilleurs_posts_interactions = meilleurs_posts_df[['URL du post', 'Date de publication du post', 'Interactions']].dropna()
+        meilleurs_posts_impressions = meilleurs_posts_df[['URL du post', 'Date de publication du post', 'Impressions']].dropna()
+
+        # Renommer les colonnes pour éviter les doublons lors de la fusion
+        meilleurs_posts_interactions.rename(columns={
+            'URL du post': 'URL',
+            'Date de publication du post': 'Date'
+        }, inplace=True)
+
+        meilleurs_posts_impressions.rename(columns={
+            'URL du post': 'URL',
+            'Date de publication du post': 'Date'
+        }, inplace=True)
+
+        # Fusionner les deux DataFrames sur URL et Date
+        meilleurs_posts_combined = pd.merge(meilleurs_posts_interactions, meilleurs_posts_impressions, on=['URL', 'Date'], how='left')
+
         # Nettoyer les données des posts
-        meilleurs_posts_df.columns = ['Date de publication', 'Interactions']
-        meilleurs_posts_df['Date de publication'] = pd.to_datetime(meilleurs_posts_df['Date de publication'], format='%d/%m/%Y', errors='coerce')
-        meilleurs_posts_df['Interactions'] = pd.to_numeric(meilleurs_posts_df['Interactions'], errors='coerce')
-        posts_per_day = meilleurs_posts_df['Date de publication'].value_counts().sort_index()
+        meilleurs_posts_combined['Date'] = pd.to_datetime(meilleurs_posts_combined['Date'], format='%d/%m/%Y', errors='coerce')
+        meilleurs_posts_combined['Interactions'] = pd.to_numeric(meilleurs_posts_combined['Interactions'], errors='coerce')
+        meilleurs_posts_combined['Impressions'] = pd.to_numeric(meilleurs_posts_combined['Impressions'], errors='coerce')
+
+        # Calculer le nombre de posts par jour
+        posts_per_day = meilleurs_posts_combined['Date'].value_counts().sort_index()
 
         # Nettoyer le dataframe des abonnés et calculer les abonnés cumulés
         abonnes_df_clean = abonnes_df.dropna()
@@ -275,7 +295,7 @@ def generate_performance_graphs(excel_data):
             "kpi_total_impressions": total_impressions,  # Nouveau KPI pour les impressions totales
             "recommendations": recommendations,
             "combined_df": combined_df,  # Pour le téléchargement
-            "meilleurs_posts_df": meilleurs_posts_df  # Ajouté pour Top Posts
+            "meilleurs_posts_combined": meilleurs_posts_combined  # Ajouté pour Top Posts
         }
 
     except Exception as e:
@@ -283,8 +303,8 @@ def generate_performance_graphs(excel_data):
         return None
 
 # Fonction pour obtenir les Top 5 Posts Performants
-def top_performing_posts(meilleurs_posts_df, top_n=5):
-    top_posts = meilleurs_posts_df.sort_values(by='Interactions', ascending=False).head(top_n)
+def top_performing_posts(meilleurs_posts_combined, top_n=5):
+    top_posts = meilleurs_posts_combined.sort_values(by='Interactions', ascending=False).head(top_n)
     return top_posts
 
 # Interface utilisateur
@@ -298,7 +318,7 @@ if uploaded_file is not None:
 
     if results:
         # Calcul des Top Posts
-        top_posts = top_performing_posts(results["meilleurs_posts_df"])
+        top_posts = top_performing_posts(results["meilleurs_posts_combined"])
 
         # Organisation des graphiques dans des onglets avec "Engagement et Abonnés" en premier
         tab_engagement, tab_posts, tab_advanced = st.tabs(["Engagement et Abonnés", "Performance des Posts", "Analyses Avancées"])
@@ -342,7 +362,7 @@ if uploaded_file is not None:
 
             # Top 5 Posts Performants
             st.subheader("Top 5 Posts Performants")
-            st.table(top_posts)
+            st.table(top_posts[['URL', 'Date', 'Interactions', 'Impressions']])
 
             # Disposition en deux colonnes : Nombre de Posts (Histogramme) et Impressions
             col1, col2 = st.columns(2)
