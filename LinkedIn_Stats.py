@@ -684,3 +684,4 @@ if uploaded_file is not None:
         st.error("Erreur dans la génération des graphiques. Veuillez vérifier vos données.")
 else:
     st.info("Veuillez télécharger un fichier Excel pour commencer l'analyse.")
+
