@@ -331,6 +331,9 @@ if uploaded_file is not None:
         with tab_posts:
             st.header("Performance des Posts")
 
+            # Indicateur supplémentaire : Total des Impressions (déjà dans KPI dans "Engagement et Abonnés")
+            # Si vous souhaitez afficher une autre mesure spécifique ici, vous pouvez l'ajouter
+
             # Disposition en deux colonnes : Nombre de Posts (Histogramme) et Impressions
             col1, col2 = st.columns(2)
             with col1:
@@ -350,9 +353,6 @@ if uploaded_file is not None:
             with col4:
                 st.plotly_chart(results["fig_engagement"], use_container_width=True)
                 st.markdown(results["explanation_engagement"])
-
-            # Ajout du KPI pour les impressions totales (déjà dans KPI dans "Engagement et Abonnés")
-            # Si vous souhaitez afficher une autre mesure spécifique ici, vous pouvez l'ajouter
 
         with tab_advanced:
             st.header("Analyses Avancées")
@@ -374,8 +374,18 @@ if uploaded_file is not None:
 
             # Section : Données Démographiques
             st.header("Données Démographiques")
-            for category, fig in results["demographics_figures"].items():
-                st.plotly_chart(fig, use_container_width=True)
+            demographics_figures = results["demographics_figures"]
+            categories = list(demographics_figures.keys())
+            num_cols = 2  # Nombre de colonnes par ligne
+
+            for i in range(0, len(categories), num_cols):
+                cols = st.columns(num_cols)
+                for j in range(num_cols):
+                    if i + j < len(categories):
+                        category = categories[i + j]
+                        fig = demographics_figures[category]
+                        with cols[j]:
+                            st.plotly_chart(fig, use_container_width=True)
 
             # Section : Téléchargement des Données
             st.header("Télécharger les Données Analytiques")
