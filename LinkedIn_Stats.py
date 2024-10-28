@@ -9,30 +9,55 @@ from fpdf import FPDF
 import plotly.io as pio
 import base64
 import tempfile
+import os
+import requests
 
 # Configuration de la page Streamlit
 st.set_page_config(page_title="Analyse des Performances LinkedIn", layout="wide")
+
+# Chemin de la police Unicode
+FONT_PATH = 'DejaVuSans.ttf'
+
+# Fonction pour télécharger la police si elle n'existe pas
+def download_font():
+    if not os.path.exists(FONT_PATH):
+        url = 'https://github.com/dejavu-fonts/dejavu-fonts/raw/master/ttf/DejaVuSans.ttf'
+        r = requests.get(url)
+        with open(FONT_PATH, 'wb') as f:
+            f.write(r.content)
+
+# Télécharger la police
+download_font()
 
 # Fonction pour convertir un DataFrame en CSV pour téléchargement
 def convert_df(df):
     return df.to_csv(index=False).encode('utf-8')
 
-# Fonction pour exporter une figure Plotly en image PNG
+# Fonction pour convertir une figure Plotly en image PNG
 def fig_to_png(fig):
     return pio.to_image(fig, format='png')
 
+# Classe PDF avec support Unicode
+class PDF(FPDF):
+    def __init__(self):
+        super().__init__()
+        self.add_font('DejaVu', '', FONT_PATH, uni=True)
+        self.set_font('DejaVu', '', 14)
+
 # Fonction pour créer un PDF à partir des images des figures
 def create_pdf(figures, titles):
-    pdf = FPDF()
+    pdf = PDF()
     for fig, title in zip(figures, titles):
         img = fig_to_png(fig)
         with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_file:
             tmp_file.write(img)
             tmp_filename = tmp_file.name
         pdf.add_page()
-        pdf.set_font("Arial", size=16)
-        pdf.cell(200, 10, txt=title, ln=True, align='C')
-        pdf.image(tmp_filename, x=10, y=20, w=190)
+        pdf.set_font('DejaVu', '', 16)
+        # Gestion des sauts de ligne et des caractères spéciaux
+        pdf.multi_cell(0, 10, txt=title, align='C')
+        pdf.image(tmp_filename, x=10, y=30, w=190)
+        os.unlink(tmp_filename)  # Supprimer le fichier temporaire
     # Sauvegarder le PDF dans un buffer
     pdf_buffer = BytesIO()
     pdf.output(pdf_buffer)
@@ -346,18 +371,24 @@ if uploaded_file is not None:
                 st.markdown(results["explanation_subscribers"])
                 # Bouton de téléchargement individuel
                 buf = fig_to_png(results["fig_subscribers"])
-                b64 = base64.b64encode(buf).decode()
-                href = f'<a href="data:application/octet-stream;base64,{b64}" download="abonnes_cumules.png">Télécharger ce graphique en PNG</a>'
-                st.markdown(href, unsafe_allow_html=True)
+                st.download_button(
+                    label="Télécharger ce graphique en PNG",
+                    data=buf,
+                    file_name="abonnes_cumules.png",
+                    mime="image/png",
+                )
 
             with col2:
                 st.plotly_chart(results["fig_corr_abonnes_engagement"], use_container_width=True)
                 st.markdown(results["explanation_corr_abonnes_engagement"])
                 # Bouton de téléchargement individuel
                 buf = fig_to_png(results["fig_corr_abonnes_engagement"])
-                b64 = base64.b64encode(buf).decode()
-                href = f'<a href="data:application/octet-stream;base64,{b64}" download="corr_abonnes_engagement.png">Télécharger ce graphique en PNG</a>'
-                st.markdown(href, unsafe_allow_html=True)
+                st.download_button(
+                    label="Télécharger ce graphique en PNG",
+                    data=buf,
+                    file_name="corr_abonnes_engagement.png",
+                    mime="image/png",
+                )
 
             # Disposition en deux colonnes : Croissance des Abonnés et Régression Linéaire
             col3, col4 = st.columns(2)
@@ -366,18 +397,24 @@ if uploaded_file is not None:
                 st.markdown(results["explanation_growth_peaks"])
                 # Bouton de téléchargement individuel
                 buf = fig_to_png(results["fig_growth_peaks"])
-                b64 = base64.b64encode(buf).decode()
-                href = f'<a href="data:application/octet-stream;base64,{b64}" download="growth_peaks.png">Télécharger ce graphique en PNG</a>'
-                st.markdown(href, unsafe_allow_html=True)
+                st.download_button(
+                    label="Télécharger ce graphique en PNG",
+                    data=buf,
+                    file_name="growth_peaks.png",
+                    mime="image/png",
+                )
 
             with col4:
                 st.plotly_chart(results["fig_regression"], use_container_width=True)
                 st.markdown(results["explanation_regression"])
                 # Bouton de téléchargement individuel
                 buf = fig_to_png(results["fig_regression"])
-                b64 = base64.b64encode(buf).decode()
-                href = f'<a href="data:application/octet-stream;base64,{b64}" download="regression_engagement.png">Télécharger ce graphique en PNG</a>'
-                st.markdown(href, unsafe_allow_html=True)
+                st.download_button(
+                    label="Télécharger ce graphique en PNG",
+                    data=buf,
+                    file_name="regression_engagement.png",
+                    mime="image/png",
+                )
 
         with tab_posts:
             st.header("Performance des Posts")
@@ -389,18 +426,24 @@ if uploaded_file is not None:
                 st.markdown(results["explanation_posts_bar"])
                 # Bouton de téléchargement individuel
                 buf = fig_to_png(results["fig_posts_bar"])
-                b64 = base64.b64encode(buf).decode()
-                href = f'<a href="data:application/octet-stream;base64,{b64}" download="posts_bar.png">Télécharger ce graphique en PNG</a>'
-                st.markdown(href, unsafe_allow_html=True)
+                st.download_button(
+                    label="Télécharger ce graphique en PNG",
+                    data=buf,
+                    file_name="posts_bar.png",
+                    mime="image/png",
+                )
 
             with col2:
                 st.plotly_chart(results["fig_impressions"], use_container_width=True)
                 st.markdown(results["explanation_impressions"])
                 # Bouton de téléchargement individuel
                 buf = fig_to_png(results["fig_impressions"])
-                b64 = base64.b64encode(buf).decode()
-                href = f'<a href="data:application/octet-stream;base64,{b64}" download="impressions.png">Télécharger ce graphique en PNG</a>'
-                st.markdown(href, unsafe_allow_html=True)
+                st.download_button(
+                    label="Télécharger ce graphique en PNG",
+                    data=buf,
+                    file_name="impressions.png",
+                    mime="image/png",
+                )
 
             # Disposition en deux colonnes : Interactions et Taux d'Engagement
             col3, col4 = st.columns(2)
@@ -409,18 +452,24 @@ if uploaded_file is not None:
                 st.markdown(results["explanation_interactions"])
                 # Bouton de téléchargement individuel
                 buf = fig_to_png(results["fig_interactions"])
-                b64 = base64.b64encode(buf).decode()
-                href = f'<a href="data:application/octet-stream;base64,{b64}" download="interactions.png">Télécharger ce graphique en PNG</a>'
-                st.markdown(href, unsafe_allow_html=True)
+                st.download_button(
+                    label="Télécharger ce graphique en PNG",
+                    data=buf,
+                    file_name="interactions.png",
+                    mime="image/png",
+                )
 
             with col4:
                 st.plotly_chart(results["fig_engagement"], use_container_width=True)
                 st.markdown(results["explanation_engagement"])
                 # Bouton de téléchargement individuel
                 buf = fig_to_png(results["fig_engagement"])
-                b64 = base64.b64encode(buf).decode()
-                href = f'<a href="data:application/octet-stream;base64,{b64}" download="engagement.png">Télécharger ce graphique en PNG</a>'
-                st.markdown(href, unsafe_allow_html=True)
+                st.download_button(
+                    label="Télécharger ce graphique en PNG",
+                    data=buf,
+                    file_name="engagement.png",
+                    mime="image/png",
+                )
 
         with tab_advanced:
             st.header("Analyses Avancées")
@@ -431,9 +480,12 @@ if uploaded_file is not None:
             st.markdown(results["explanation_corr_matrix"])
             # Bouton de téléchargement individuel
             buf = fig_to_png(results["fig_corr_matrix"])
-            b64 = base64.b64encode(buf).decode()
-            href = f'<a href="data:application/octet-stream;base64,{b64}" download="corr_matrix.png">Télécharger ce graphique en PNG</a>'
-            st.markdown(href, unsafe_allow_html=True)
+            st.download_button(
+                label="Télécharger ce graphique en PNG",
+                data=buf,
+                file_name="corr_matrix.png",
+                mime="image/png",
+            )
 
             # Disposition en deux colonnes pour les corrélations supplémentaires
             col1, col2 = st.columns(2)
@@ -442,18 +494,24 @@ if uploaded_file is not None:
                 st.markdown(results["explanation_corr_inter_impr"])
                 # Bouton de téléchargement individuel
                 buf = fig_to_png(results["fig_corr_inter_impr"])
-                b64 = base64.b64encode(buf).decode()
-                href = f'<a href="data:application/octet-stream;base64,{b64}" download="corr_inter_impr.png">Télécharger ce graphique en PNG</a>'
-                st.markdown(href, unsafe_allow_html=True)
+                st.download_button(
+                    label="Télécharger ce graphique en PNG",
+                    data=buf,
+                    file_name="corr_inter_impr.png",
+                    mime="image/png",
+                )
 
             with col2:
                 st.plotly_chart(results["fig_corr_posts_engagement"], use_container_width=True)
                 st.markdown(results["explanation_corr_posts_engagement"])
                 # Bouton de téléchargement individuel
                 buf = fig_to_png(results["fig_corr_posts_engagement"])
-                b64 = base64.b64encode(buf).decode()
-                href = f'<a href="data:application/octet-stream;base64,{b64}" download="corr_posts_engagement.png">Télécharger ce graphique en PNG</a>'
-                st.markdown(href, unsafe_allow_html=True)
+                st.download_button(
+                    label="Télécharger ce graphique en PNG",
+                    data=buf,
+                    file_name="corr_posts_engagement.png",
+                    mime="image/png",
+                )
 
             # Section : Données Démographiques
             st.header("Données Démographiques")
@@ -471,9 +529,12 @@ if uploaded_file is not None:
                             st.plotly_chart(fig, use_container_width=True)
                             # Bouton de téléchargement individuel
                             buf = fig_to_png(fig)
-                            b64 = base64.b64encode(buf).decode()
-                            href = f'<a href="data:application/octet-stream;base64,{b64}" download="distribution_{category}.png">Télécharger ce graphique en PNG</a>'
-                            st.markdown(href, unsafe_allow_html=True)
+                            st.download_button(
+                                label=f"Télécharger {category} en PNG",
+                                data=buf,
+                                file_name=f"distribution_{category}.png",
+                                mime="image/png",
+                            )
 
             # Section : Téléchargement des Données
             st.header("Télécharger les Données Analytiques")
@@ -526,10 +587,13 @@ if uploaded_file is not None:
                 # Créer le PDF
                 pdf_buffer = create_pdf(figures, titles)
 
-                # Encoder le PDF en base64 pour le téléchargement
-                b64 = base64.b64encode(pdf_buffer.read()).decode()
-                href = f'<a href="data:application/octet-stream;base64,{b64}" download="tous_les_graphiques.pdf">Télécharger le PDF</a>'
-                st.markdown(href, unsafe_allow_html=True)
+                # Bouton de téléchargement du PDF
+                st.download_button(
+                    label="Télécharger le PDF",
+                    data=pdf_buffer,
+                    file_name="tous_les_graphiques.pdf",
+                    mime="application/pdf",
+                )
 
     else:
         st.error("Erreur dans la génération des graphiques. Veuillez vérifier vos données.")
