@@ -214,9 +214,18 @@ def generate_performance_graphs(excel_data):
                          hole=0.3,
                          color_discrete_sequence=px.colors.sequential.Plasma)
 
-            # Ajouter des étiquettes de pourcentage et masquer la légende
+            # Ajouter des étiquettes de pourcentage et placer la légende en dessous
             fig.update_traces(textinfo='percent+label', textposition='inside')
-            fig.update_layout(showlegend=False)
+            fig.update_layout(
+                showlegend=True,
+                legend=dict(
+                    orientation="h",
+                    yanchor="bottom",
+                    y=-0.2,
+                    xanchor="center",
+                    x=0.5
+                )
+            )
 
             demographics_figures[category] = fig
 
