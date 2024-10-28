@@ -274,12 +274,18 @@ def generate_performance_graphs(excel_data):
             "kpi_total_interactions": total_interactions,
             "kpi_total_impressions": total_impressions,  # Nouveau KPI pour les impressions totales
             "recommendations": recommendations,
-            "combined_df": combined_df  # Pour le téléchargement
+            "combined_df": combined_df,  # Pour le téléchargement
+            "meilleurs_posts_df": meilleurs_posts_df  # Ajouté pour Top Posts
         }
 
     except Exception as e:
         st.error(f"Une erreur est survenue lors de la génération des graphiques : {e}")
         return None
+
+# Fonction pour obtenir les Top 5 Posts Performants
+def top_performing_posts(meilleurs_posts_df, top_n=5):
+    top_posts = meilleurs_posts_df.sort_values(by='Interactions', ascending=False).head(top_n)
+    return top_posts
 
 # Interface utilisateur
 st.sidebar.header("Paramètres")
@@ -291,6 +297,9 @@ if uploaded_file is not None:
     results = generate_performance_graphs(uploaded_file)
 
     if results:
+        # Calcul des Top Posts
+        top_posts = top_performing_posts(results["meilleurs_posts_df"])
+
         # Organisation des graphiques dans des onglets avec "Engagement et Abonnés" en premier
         tab_engagement, tab_posts, tab_advanced = st.tabs(["Engagement et Abonnés", "Performance des Posts", "Analyses Avancées"])
 
@@ -331,8 +340,9 @@ if uploaded_file is not None:
         with tab_posts:
             st.header("Performance des Posts")
 
-            # Indicateur supplémentaire : Total des Impressions (déjà dans KPI dans "Engagement et Abonnés")
-            # Si vous souhaitez afficher une autre mesure spécifique ici, vous pouvez l'ajouter
+            # Top 5 Posts Performants
+            st.subheader("Top 5 Posts Performants")
+            st.table(top_posts)
 
             # Disposition en deux colonnes : Nombre de Posts (Histogramme) et Impressions
             col1, col2 = st.columns(2)
@@ -386,6 +396,7 @@ if uploaded_file is not None:
                         fig = demographics_figures[category]
                         with cols[j]:
                             st.plotly_chart(fig, use_container_width=True)
+                st.markdown("<br>", unsafe_allow_html=True)  # Ajoute un espace entre les lignes
 
             # Section : Téléchargement des Données
             st.header("Télécharger les Données Analytiques")
