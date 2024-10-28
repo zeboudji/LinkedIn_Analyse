@@ -5,8 +5,6 @@ import plotly.figure_factory as ff
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import r2_score
 from io import BytesIO
-from fpdf import FPDF
-import base64
 
 # Configuration de la page Streamlit
 st.set_page_config(page_title="Analyse des Performances LinkedIn", layout="wide")
@@ -14,52 +12,6 @@ st.set_page_config(page_title="Analyse des Performances LinkedIn", layout="wide"
 # Fonction pour convertir un DataFrame en CSV pour téléchargement
 def convert_df(df):
     return df.to_csv(index=False).encode('utf-8')
-
-# Fonction pour rendre les URL cliquables en HTML
-def make_clickable(url):
-    return f'<a href="{url}" target="_blank">{url}</a>'
-
-# Fonction pour afficher les Top 5 posts performants
-def top_performing_posts(meilleurs_posts_df_clean):
-    # Convertir les colonnes en types appropriés si ce n'est pas déjà fait
-    meilleurs_posts_df_clean['Interactions'] = pd.to_numeric(meilleurs_posts_df_clean['Interactions'], errors='coerce')
-    meilleurs_posts_df_clean['Impressions'] = pd.to_numeric(meilleurs_posts_df_clean['Impressions'], errors='coerce')
-    meilleurs_posts_df_clean['Date_de_publication_post'] = pd.to_datetime(meilleurs_posts_df_clean['Date_de_publication_post'], format='%Y-%m-%d', errors='coerce')
-    
-    # Trier les posts par le nombre d'interactions pour obtenir le top 5
-    top_5_posts = meilleurs_posts_df_clean.sort_values(by='Interactions', ascending=False).head(5)
-    
-    # Rendre les URL cliquables
-    top_5_posts['URL_du_post'] = top_5_posts['URL_du_post'].apply(lambda url: make_clickable(url))
-    
-    # Sélectionner les colonnes pertinentes pour l'affichage
-    top_5_posts_display = top_5_posts[['URL_du_post', 'Date_de_publication_post', 'Interactions', 'Impressions']].copy()
-    
-    # Retourner le tableau en HTML pour affichage dans Streamlit
-    return top_5_posts_display.to_html(escape=False, index=False)
-
-# Fonctions pour exporter les graphiques en PDF
-def save_fig_as_image(fig):
-    """
-    Sauvegarde une figure Plotly en tant qu'image PNG en mémoire.
-    """
-    img_bytes = fig.to_image(format="png")
-    return img_bytes
-
-def create_pdf(figures, titles):
-    """
-    Crée un PDF à partir d'une liste d'images en mémoire.
-    """
-    pdf = FPDF()
-    for img, title in zip(figures, titles):
-        pdf.add_page()
-        pdf.set_font("Arial", size=12)
-        pdf.multi_cell(0, 10, title)
-        # Enregistrer l'image temporairement
-        with BytesIO(img) as img_buffer:
-            encoded = base64.b64encode(img_buffer.read()).decode('latin1')
-            pdf.image(f"data:image/png;base64,{encoded}", x=10, y=20, w=190)
-    return pdf.output(dest="S").encode("latin1")
 
 # Fonction pour générer les graphiques de performance
 def generate_performance_graphs(excel_data):
@@ -70,7 +22,7 @@ def generate_performance_graphs(excel_data):
         # Charger chaque feuille pertinente dans des dataframes
         engagement_df = pd.read_excel(xls, 'ENGAGEMENT')
         abonnes_df = pd.read_excel(xls, 'ABONNÉS', skiprows=2)
-        meilleurs_posts_df = pd.read_excel(xls, 'MEILLEURS POSTS', skiprows=2, usecols="B:E")  # Colonnes B à E
+        meilleurs_posts_df = pd.read_excel(xls, 'MEILLEURS POSTS').iloc[2:, 1:3]
         demographics_df = pd.read_excel(xls, 'DONNÉES DÉMOGRAPHIQUES')
 
         # Nettoyer les noms de colonnes pour enlever les espaces
@@ -79,20 +31,11 @@ def generate_performance_graphs(excel_data):
         meilleurs_posts_df.columns = meilleurs_posts_df.columns.str.strip()
         demographics_df.columns = demographics_df.columns.str.strip()
 
-        # Vérifier les colonnes lues dans 'MEILLEURS POSTS'
-        st.write("Colonnes dans 'MEILLEURS POSTS':", meilleurs_posts_df.columns.tolist())
-
         # Nettoyer les données des posts
-        meilleurs_posts_df.columns = ['URL_du_post', 'Date_de_publication_post', 'Interactions', 'Impressions']
-        meilleurs_posts_df['Date_de_publication_post'] = pd.to_datetime(meilleurs_posts_df['Date_de_publication_post'], format='%Y-%m-%d', errors='coerce')
+        meilleurs_posts_df.columns = ['Date de publication', 'Interactions']
+        meilleurs_posts_df['Date de publication'] = pd.to_datetime(meilleurs_posts_df['Date de publication'], format='%d/%m/%Y', errors='coerce')
         meilleurs_posts_df['Interactions'] = pd.to_numeric(meilleurs_posts_df['Interactions'], errors='coerce')
-        meilleurs_posts_df['Impressions'] = pd.to_numeric(meilleurs_posts_df['Impressions'], errors='coerce')
-        meilleurs_posts_df_clean = meilleurs_posts_df.copy()
-
-        # Remplir les NaN dans 'Impressions' si nécessaire, par exemple avec 0 ou une autre stratégie
-        meilleurs_posts_df_clean['Impressions'] = meilleurs_posts_df_clean['Impressions'].fillna(0)
-
-        posts_per_day = meilleurs_posts_df_clean['Date_de_publication_post'].value_counts().sort_index()
+        posts_per_day = meilleurs_posts_df['Date de publication'].value_counts().sort_index()
 
         # Nettoyer le dataframe des abonnés et calculer les abonnés cumulés
         abonnes_df_clean = abonnes_df.dropna()
@@ -257,23 +200,20 @@ def generate_performance_graphs(excel_data):
             # Trier les valeurs par pourcentage décroissant
             df_category = df_category.sort_values(by='Pourcentage', ascending=False)
 
-            # Créer un graphique en camembert pour chaque catégorie avec des améliorations
+            # Créer un graphique en camembert pour chaque catégorie
             fig = px.pie(df_category, values='Pourcentage', names='Valeur',
                          title=f'Distribution de {category}',
                          template='plotly_dark',
-                         hole=0.3,
-                         labels={'Valeur': 'Valeur'},
-                         hover_data=['Pourcentage'],
-                         color_discrete_sequence=px.colors.qualitative.Pastel)
-            fig.update_traces(textposition='inside', textinfo='percent+label')
+                         hole=0.3)
             demographics_figures[category] = fig
 
         # Préparer le dictionnaire de retour
         return {
-            "fig_engagement": fig_engagement,
-            "explanation_engagement": """
-            **Interprétation :** Le taux d'engagement est calculé en divisant les interactions par les impressions. 
-            Un taux d'engagement élevé signifie que votre contenu résonne bien avec votre audience. Suivez ce taux pour évaluer l'efficacité de vos posts.
+            "fig_posts_bar": fig_posts_bar,
+            "explanation_posts_bar": """
+            **Interprétation :** Cet histogramme montre le nombre de posts publiés chaque jour. 
+            Une fréquence de publication régulière peut aider à maintenir l'engagement de votre audience. 
+            Identifiez les jours où vous publiez le plus ou le moins et ajustez votre stratégie en conséquence.
             """,
             "fig_impressions": fig_impressions,
             "explanation_impressions": """
@@ -284,6 +224,11 @@ def generate_performance_graphs(excel_data):
             "explanation_interactions": """
             **Interprétation :** Les interactions incluent les likes, commentaires et partages de vos posts. 
             Un nombre élevé d'interactions indique un bon engagement de votre audience. Identifiez les types de contenus qui génèrent le plus d'interactions.
+            """,
+            "fig_engagement": fig_engagement,
+            "explanation_engagement": """
+            **Interprétation :** Le taux d'engagement est calculé en divisant les interactions par les impressions. 
+            Un taux d'engagement élevé signifie que votre contenu résonne bien avec votre audience. Suivez ce taux pour évaluer l'efficacité de vos posts.
             """,
             "fig_subscribers": fig_subscribers,
             "explanation_subscribers": """
@@ -323,20 +268,13 @@ def generate_performance_graphs(excel_data):
             Le coefficient de détermination (R² = {r2_value:.2f}) indique la proportion de la variance du taux d'engagement expliquée par le modèle. 
             Un R² proche de 1 suggère que le modèle prédit bien le taux d'engagement.
             """,
-            "fig_posts_bar": fig_posts_bar,
-            "explanation_posts_bar": """
-            **Interprétation :** Cet histogramme montre le nombre de posts publiés chaque jour. 
-            Une fréquence de publication régulière peut aider à maintenir l'engagement de votre audience. 
-            Identifiez les jours où vous publiez le plus ou le moins et ajustez votre stratégie en conséquence.
-            """,
             "demographics_figures": demographics_figures,
             "kpi_mean_engagement_rate": mean_engagement_rate,
             "kpi_mean_growth_rate": mean_growth_rate,
             "kpi_total_interactions": total_interactions,
             "kpi_total_impressions": total_impressions,  # Nouveau KPI pour les impressions totales
             "recommendations": recommendations,
-            "combined_df": combined_df,  # Pour le téléchargement
-            "meilleurs_posts_df_clean": meilleurs_posts_df_clean  # Ajout pour le Top 5 des posts
+            "combined_df": combined_df  # Pour le téléchargement
         }
 
     except Exception as e:
@@ -393,10 +331,8 @@ if uploaded_file is not None:
         with tab_posts:
             st.header("Performance des Posts")
 
-            # Affichage des Top 5 posts performants
-            st.subheader("Top 5 Posts Performants")
-            top_5_html = top_performing_posts(results["meilleurs_posts_df_clean"])
-            st.write(top_5_html, unsafe_allow_html=True)
+            # Indicateur supplémentaire : Total des Impressions (déjà dans KPI dans "Engagement et Abonnés")
+            # Si vous souhaitez afficher une autre mesure spécifique ici, vous pouvez l'ajouter
 
             # Disposition en deux colonnes : Nombre de Posts (Histogramme) et Impressions
             col1, col2 = st.columns(2)
@@ -451,11 +387,8 @@ if uploaded_file is not None:
                         with cols[j]:
                             st.plotly_chart(fig, use_container_width=True)
 
-            # Section : Téléchargement des Données et Exportation PDF
-            st.header("Téléchargement des Données et Exportation PDF")
-
-            # Téléchargement des Données
-            st.subheader("Télécharger les Données Analytiques")
+            # Section : Téléchargement des Données
+            st.header("Télécharger les Données Analytiques")
             csv = convert_df(results["combined_df"])
             st.download_button(
                 label="Télécharger les Données Analytiques",
@@ -463,60 +396,6 @@ if uploaded_file is not None:
                 file_name='analyse_linkedin.csv',
                 mime='text/csv',
             )
-
-            # Exportation des Graphiques en PDF
-            st.subheader("Exporter les Graphiques en PDF")
-
-            # Collecter toutes les figures et leurs titres
-            all_figures = [
-                (results["fig_engagement"], "Taux d'Engagement au Fil du Temps"),
-                (results["fig_impressions"], "Impressions au Fil du Temps"),
-                (results["fig_interactions"], "Interactions au Fil du Temps"),
-                (results["fig_subscribers"], "Abonnés Cumulés au Fil du Temps"),
-                (results["fig_posts_bar"], "Nombre de Posts par Jour"),
-                (results["fig_corr_abonnes_engagement"], "Corrélation entre Abonnés Cumulés et Taux d'Engagement"),
-                (results["fig_growth_peaks"], "Analyse des Pics de Croissance des Abonnés"),
-                (results["fig_corr_matrix"], "Matrice de Corrélation"),
-                (results["fig_corr_inter_impr"], "Corrélation entre Impressions et Interactions"),
-                (results["fig_corr_posts_engagement"], "Corrélation entre Nombre de Posts et Taux d'Engagement"),
-                (results["fig_regression"], "Régression Linéaire pour Prédire le Taux d'Engagement"),
-            ]
-
-            # Ajouter les graphiques démographiques
-            for category, fig in demographics_figures.items():
-                all_figures.append((fig, f"Distribution de {category}"))
-
-            # Fonction pour générer le PDF
-            def generate_pdf(all_figures):
-                figures_images = []
-                titles = []
-                for fig, title in all_figures:
-                    img_bytes = save_fig_as_image(fig)
-                    figures_images.append(img_bytes)
-                    titles.append(title)
-                pdf_bytes = create_pdf(figures_images, titles)
-                return pdf_bytes
-
-            # Générer le PDF
-            pdf_bytes = generate_pdf(all_figures)
-
-            # Bouton de téléchargement pour le PDF groupé
-            st.download_button(
-                label="Télécharger Tous les Graphiques en PDF",
-                data=pdf_bytes,
-                file_name='analyse_linkedin.pdf',
-                mime='application/pdf',
-            )
-
-            # Bouton de téléchargement individuel
-            st.markdown("### Télécharger les Graphiques Individuellement")
-            for fig, title in all_figures:
-                img_bytes = save_fig_as_image(fig)
-                # Encode l'image en base64 pour le téléchargement
-                b64 = base64.b64encode(img_bytes).decode()
-                href = f'<a href="data:image/png;base64,{b64}" download="{title}.png">Télécharger {title}.png</a>'
-                st.markdown(href, unsafe_allow_html=True)
-
     else:
         st.error("Erreur dans la génération des graphiques. Veuillez vérifier vos données.")
 else:
