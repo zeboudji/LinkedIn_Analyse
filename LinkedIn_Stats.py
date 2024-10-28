@@ -28,7 +28,7 @@ def generate_performance_graphs(excel_data):
         # Charger chaque feuille pertinente dans des dataframes
         engagement_df = pd.read_excel(xls, 'ENGAGEMENT')
         abonnes_df = pd.read_excel(xls, 'ABONNÉS', skiprows=2)
-        meilleurs_posts_df = pd.read_excel(xls, 'MEILLEURS POSTS')
+        meilleurs_posts_df = pd.read_excel(xls, 'MEILLEURS POSTS', skiprows=1)
         demographics_df = pd.read_excel(xls, 'DONNÉES DÉMOGRAPHIQUES')
 
         # Nettoyer les noms de colonnes pour enlever les espaces
@@ -37,23 +37,28 @@ def generate_performance_graphs(excel_data):
         meilleurs_posts_df.columns = meilleurs_posts_df.columns.str.strip()
         demographics_df.columns = demographics_df.columns.str.strip()
 
-        # Afficher les noms des colonnes pour vérification
-        print("Colonnes dans 'MEILLEURS POSTS' :", meilleurs_posts_df.columns.tolist())
+        # Afficher les noms des colonnes pour vérification dans l'application
+        st.sidebar.header("Informations sur les Colonnes")
+        st.sidebar.write("Colonnes dans 'MEILLEURS POSTS' :", meilleurs_posts_df.columns.tolist())
 
-        # Séparer les données des posts en deux DataFrames
-        # Colonnes A–C
-        if {'URL du post', 'Date de publication du post', 'Interactions'}.issubset(meilleurs_posts_df.columns):
-            meilleurs_posts_interactions = meilleurs_posts_df[['URL du post', 'Date de publication du post', 'Interactions']].dropna(subset=['URL du post'])
-        else:
+        # Vérifier si les colonnes nécessaires existent
+        required_cols_interactions = {'URL du post', 'Date de publication du post', 'Interactions'}
+        required_cols_impressions = {'URL du post.1', 'Date de publication du post.1', 'Impressions'}
+
+        if not required_cols_interactions.issubset(meilleurs_posts_df.columns):
             st.error("Les colonnes A–C sont manquantes ou mal nommées dans la feuille 'MEILLEURS POSTS'.")
             return None
 
-        # Colonnes E–G
-        if {'URL du post.1', 'Date de publication du post.1', 'Impressions'}.issubset(meilleurs_posts_df.columns):
-            meilleurs_posts_impressions = meilleurs_posts_df[['URL du post.1', 'Date de publication du post.1', 'Impressions']].dropna(subset=['URL du post.1'])
-        else:
+        if not required_cols_impressions.issubset(meilleurs_posts_df.columns):
             st.error("Les colonnes E–G sont manquantes ou mal nommées dans la feuille 'MEILLEURS POSTS'.")
             return None
+
+        # Séparer les données des posts en deux DataFrames
+        # Colonnes A–C
+        meilleurs_posts_interactions = meilleurs_posts_df[['URL du post', 'Date de publication du post', 'Interactions']].dropna(subset=['URL du post'])
+
+        # Colonnes E–G
+        meilleurs_posts_impressions = meilleurs_posts_df[['URL du post.1', 'Date de publication du post.1', 'Impressions']].dropna(subset=['URL du post.1'])
 
         # Renommer les colonnes pour éviter les doublons lors de la fusion
         meilleurs_posts_interactions.rename(columns={
@@ -79,8 +84,7 @@ def generate_performance_graphs(excel_data):
 
         # Nettoyer le dataframe des abonnés et calculer les abonnés cumulés
         abonnes_df_clean = abonnes_df.dropna(subset=['Date', 'Nouveaux abonnés'])
-        date_column_abonnes = 'Date'  # Nom de la colonne date après nettoyage
-        abonnes_df_clean.rename(columns={date_column_abonnes: 'Date'}, inplace=True)
+        abonnes_df_clean.rename(columns={'Date': 'Date'}, inplace=True)
         abonnes_df_clean['Date'] = pd.to_datetime(abonnes_df_clean['Date'], format='%d/%m/%Y', errors='coerce')
         abonnes_df_clean['Nouveaux abonnés'] = pd.to_numeric(abonnes_df_clean['Nouveaux abonnés'], errors='coerce').fillna(0).astype(int)
         abonnes_df_clean['Cumulative Subscribers'] = abonnes_df_clean['Nouveaux abonnés'].cumsum()
@@ -235,7 +239,6 @@ def generate_performance_graphs(excel_data):
         demographics_df['Pourcentage'] = pd.to_numeric(demographics_df['Pourcentage'], errors='coerce')
 
         # Identifier les catégories spécifiques, par exemple 'Secteur'
-        # Supposons que 'Principales données démographiques' inclut 'Secteur'
         demographics_categories = demographics_df['Principales données démographiques'].unique()
 
         # Créer un dictionnaire pour stocker les figures démographiques
