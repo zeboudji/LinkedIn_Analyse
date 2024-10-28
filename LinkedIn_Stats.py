@@ -5,37 +5,12 @@ import plotly.figure_factory as ff
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import r2_score
 from io import BytesIO
-from fpdf import FPDF, errors
 import plotly.io as pio
 import base64
 import tempfile
-import os
-import requests
 
 # Configuration de la page Streamlit
 st.set_page_config(page_title="Analyse des Performances LinkedIn", layout="wide")
-
-# Chemin de la police Unicode
-FONT_PATH = 'DejaVuSans.ttf'
-
-# Fonction pour télécharger la police si elle n'existe pas
-def download_font():
-    if not os.path.exists(FONT_PATH):
-        url = 'https://github.com/dejavu-fonts/dejavu-fonts/raw/master/ttf/DejaVuSans.ttf'
-        try:
-            r = requests.get(url, timeout=10)
-            r.raise_for_status()
-            with open(FONT_PATH, 'wb') as f:
-                f.write(r.content)
-            st.success("Police téléchargée avec succès.")
-        except requests.exceptions.RequestException as e:
-            st.error(f"Erreur lors du téléchargement de la police : {e}")
-            return False
-    return True
-
-# Télécharger la police
-if not download_font():
-    st.stop()
 
 # Fonction pour convertir un DataFrame en CSV pour téléchargement
 def convert_df(df):
@@ -44,37 +19,6 @@ def convert_df(df):
 # Fonction pour convertir une figure Plotly en image PNG
 def fig_to_png(fig):
     return pio.to_image(fig, format='png')
-
-# Classe PDF avec support Unicode
-class PDF(FPDF):
-    def __init__(self):
-        super().__init__()
-        try:
-            self.add_font('DejaVu', '', FONT_PATH, uni=True)
-            self.set_font('DejaVu', '', 14)
-        except errors.FPDFUnicodeEncodingException as e:
-            st.error(f"Erreur lors de l'ajout de la police : {e}")
-            st.stop()
-
-# Fonction pour créer un PDF à partir des images des figures
-def create_pdf(figures, titles):
-    pdf = PDF()
-    for fig, title in zip(figures, titles):
-        img = fig_to_png(fig)
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_file:
-            tmp_file.write(img)
-            tmp_filename = tmp_file.name
-        pdf.add_page()
-        pdf.set_font('DejaVu', '', 16)
-        # Gestion des sauts de ligne et des caractères spéciaux
-        pdf.multi_cell(0, 10, txt=title, align='C')
-        pdf.image(tmp_filename, x=10, y=30, w=190)
-        os.unlink(tmp_filename)  # Supprimer le fichier temporaire
-    # Sauvegarder le PDF dans un buffer
-    pdf_buffer = BytesIO()
-    pdf.output(pdf_buffer)
-    pdf_buffer.seek(0)
-    return pdf_buffer
 
 # Fonction pour générer les graphiques de performance
 def generate_performance_graphs(excel_data):
@@ -270,8 +214,9 @@ def generate_performance_graphs(excel_data):
                          hole=0.3,
                          color_discrete_sequence=px.colors.sequential.Plasma)
 
-            # Ajouter des étiquettes de pourcentage
+            # Ajouter des étiquettes de pourcentage et masquer la légende
             fig.update_traces(textinfo='percent+label', textposition='inside')
+            fig.update_layout(showlegend=False)
 
             demographics_figures[category] = fig
 
@@ -557,55 +502,6 @@ if uploaded_file is not None:
                 file_name='analyse_linkedin.csv',
                 mime='text/csv',
             )
-
-            # Bouton pour télécharger tous les graphiques en PDF
-            st.header("Télécharger Tous les Graphiques en PDF")
-            if st.button("Exporter tout en PDF"):
-                # Collecter toutes les figures et leurs titres
-                figures = [
-                    results["fig_engagement"],
-                    results["fig_impressions"],
-                    results["fig_interactions"],
-                    results["fig_subscribers"],
-                    results["fig_posts_bar"],
-                    results["fig_corr_abonnes_engagement"],
-                    results["fig_growth_peaks"],
-                    results["fig_corr_matrix"],
-                    results["fig_corr_inter_impr"],
-                    results["fig_corr_posts_engagement"],
-                    results["fig_regression"]
-                ]
-                # Ajouter les graphiques démographiques
-                for category in categories:
-                    figures.append(demographics_figures[category])
-
-                titles = [
-                    "Taux d'Engagement au Fil du Temps",
-                    "Impressions au Fil du Temps",
-                    "Interactions au Fil du Temps",
-                    "Abonnés Cumulés au Fil du Temps",
-                    "Nombre de Posts par Jour",
-                    "Corrélation Abonnés-Engagement",
-                    "Analyse des Pics de Croissance des Abonnés",
-                    "Matrice de Corrélation",
-                    "Corrélation Impressions-Interactions",
-                    "Corrélation Posts-Engagement",
-                    "Régression Linéaire Engagement",
-                ]
-                # Ajouter les titres des graphiques démographiques
-                for category in categories:
-                    titles.append(f"Distribution de {category}")
-
-                # Créer le PDF
-                pdf_buffer = create_pdf(figures, titles)
-
-                # Bouton de téléchargement du PDF
-                st.download_button(
-                    label="Télécharger le PDF",
-                    data=pdf_buffer,
-                    file_name="tous_les_graphiques.pdf",
-                    mime="application/pdf",
-                )
 
     else:
         st.error("Erreur dans la génération des graphiques. Veuillez vérifier vos données.")
