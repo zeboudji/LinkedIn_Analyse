@@ -5,7 +5,7 @@ import plotly.figure_factory as ff
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import r2_score
 from io import BytesIO
-from fpdf import FPDF
+from fpdf import FPDF, errors
 import plotly.io as pio
 import base64
 import tempfile
@@ -22,12 +22,20 @@ FONT_PATH = 'DejaVuSans.ttf'
 def download_font():
     if not os.path.exists(FONT_PATH):
         url = 'https://github.com/dejavu-fonts/dejavu-fonts/raw/master/ttf/DejaVuSans.ttf'
-        r = requests.get(url)
-        with open(FONT_PATH, 'wb') as f:
-            f.write(r.content)
+        try:
+            r = requests.get(url, timeout=10)
+            r.raise_for_status()
+            with open(FONT_PATH, 'wb') as f:
+                f.write(r.content)
+            st.success("Police téléchargée avec succès.")
+        except requests.exceptions.RequestException as e:
+            st.error(f"Erreur lors du téléchargement de la police : {e}")
+            return False
+    return True
 
 # Télécharger la police
-download_font()
+if not download_font():
+    st.stop()
 
 # Fonction pour convertir un DataFrame en CSV pour téléchargement
 def convert_df(df):
@@ -41,8 +49,12 @@ def fig_to_png(fig):
 class PDF(FPDF):
     def __init__(self):
         super().__init__()
-        self.add_font('DejaVu', '', FONT_PATH, uni=True)
-        self.set_font('DejaVu', '', 14)
+        try:
+            self.add_font('DejaVu', '', FONT_PATH, uni=True)
+            self.set_font('DejaVu', '', 14)
+        except errors.FPDFUnicodeEncodingException as e:
+            st.error(f"Erreur lors de l'ajout de la police : {e}")
+            st.stop()
 
 # Fonction pour créer un PDF à partir des images des figures
 def create_pdf(figures, titles):
